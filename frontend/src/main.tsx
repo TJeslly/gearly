@@ -16,6 +16,20 @@ const TIPOS = [
 ]
 const NOMBRE: Record<string, string> = Object.fromEntries([...DISCIPLINAS, ...TIPOS].map(x => [x.id, x.nombre]))
 const MAX = 5
+// Versión en español validada del System Usability Scale (Sevilla-González et al., 2020, JMIR Human Factors, CC BY 4.0).
+// Texto sin modificar; todas las preguntas son obligatorias y no admiten "No puedo evaluar".
+const SUS = [
+  'Me gustaría usar esta herramienta frecuentemente.',
+  'Considero que esta herramienta es innecesariamente compleja',
+  'Considero que la herramienta es fácil de usar.',
+  'Considero necesario el apoyo de personal experto para poder utilizar esta herramienta',
+  'Considero que las funciones de la herramienta están bien integradas',
+  'Considero que la herramienta presenta muchas contradicciones',
+  'Imagino que la mayoría de las personas aprenderían a usar esta herramienta rápidamente',
+  'Considero que el uso de esta herramienta es tedioso',
+  'Me sentí muy confiado al usar la herramienta',
+  'Necesité saber bastantes cosas antes de poder empezar a usar esta herramienta',
+]
 const PREGUNTAS = [
   ['intereses', 'Entendí para qué se pedían mis intereses.'],
   ['expresar', 'Pude expresar mis intereses con las opciones disponibles.'],
@@ -312,7 +326,7 @@ function Evaluar({ estado, terminar, irAPerfil }: { estado: Estado; terminar: ()
   )
 
   const faltan = ev.productos.filter(p => !(p.id in juicios)).length
-  const faltanEnc = PREGUNTAS.filter(([k]) => !(k in enc)).length
+  const faltanEnc = PREGUNTAS.filter(([k]) => !(k in enc)).length + SUS.filter((_, i) => !(`sus${i + 1}` in enc)).length
   return (
     <section>
       <h1>¿Qué tan pertinente es cada producto para ti?</h1>
@@ -327,7 +341,19 @@ function Evaluar({ estado, terminar, irAPerfil }: { estado: Estado; terminar: ()
           </Tarjeta>
         ))}
       </div>
-      <h2>Tu experiencia</h2>
+      <h2>Usabilidad de la herramienta</h2>
+      <p className="ayuda">Por favor seleccione de cada uno de los enunciados la opción que mejor describa su experiencia con la herramienta electrónica. Un puntaje de 1 significa que usted se encuentra totalmente en desacuerdo con el enunciado, mientras que un puntaje en 5 significa que está totalmente de acuerdo, un puntaje de 3 significaría que usted se encuentra neutral con el enunciado.</p>
+      <div className="encuesta">
+        {SUS.map((t, i) => {
+          const k = `sus${i + 1}`
+          return (
+            <fieldset key={k}><legend>{i + 1}. {t}</legend>
+              {[1, 2, 3, 4, 5].map(v => <button key={v} className={enc[k] === v ? 'activo' : ''} aria-pressed={enc[k] === v} onClick={() => setEnc({ ...enc, [k]: v })}>{v}</button>)}
+            </fieldset>
+          )
+        })}
+      </div>
+      <h2>Tu experiencia con Gearly</h2>
       <p className="ayuda">1 = totalmente en desacuerdo, 5 = totalmente de acuerdo.</p>
       <div className="encuesta">
         {PREGUNTAS.map(([k, t]) => (

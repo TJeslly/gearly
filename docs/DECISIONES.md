@@ -21,3 +21,7 @@
 Después de la primera corrida v2 se corrigió la asignación de tipo (las riñoneras y correas quedaban como «equipamiento»), se tradujeron más categorías y se excluyeron 4 productos clasificados por rutas promocionales («PD23…», «Holiday…»). Se volvió a correr todo. La conclusión no cambió: en la primera corrida HIB − CONT (k = 3) fue +0,0266 [0,0179; 0,0356]; en la vigente, +0,0274 [0,0187; 0,0362]. Se informan las cifras vigentes.
 
 **Hallazgo del catálogo:** la categoría Sports and Outdoors de Amazon Reviews 2023 casi no tiene ropa ni calzado deportivo (están en otra categoría del conjunto). La app oculta los tipos sin productos. Running queda con 259 productos, la mayoría riñoneras e hidratación.
+
+## SUS en la evaluación (7 de noviembre de 2026)
+
+A pedido del tutor se añadió el **System Usability Scale** en su versión en español validada (Sevilla-González et al., 2020, JMIR Human Factors, CC BY 4.0), con el texto y la instrucción sin modificar. Las 10 preguntas son obligatorias, no admiten «No puedo evaluar» y se responden antes de las seis preguntas propias de Gearly, que se analizan aparte. La exportación calcula el puntaje SUS de 0 a 100 (Brooke, 1996): ítems impares x − 1, pares 5 − x, suma × 2,5.

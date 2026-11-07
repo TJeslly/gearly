@@ -90,8 +90,18 @@ def test_evaluacion_ciega_y_exportacion(c):
     assert len(ids) == len(set(ids)) and 'metodo' not in str(r)
     assert c.put(f'/evaluacion/{r["evaluacion_id"]}', json={'juicios': {ids[0]: 5}}).status_code == 422
     juicios = {i: 4 for i in ids}; juicios[ids[0]] = None
-    assert c.put(f'/evaluacion/{r["evaluacion_id"]}', json={'juicios': juicios, 'encuesta': {'claridad': 5}}).status_code == 200
+    assert c.put(f'/evaluacion/{r["evaluacion_id"]}', json={'juicios': juicios, 'encuesta': {'claridad': 5}}).status_code == 422  # falta SUS
+    sus = {f'sus{i}': (5 if i % 2 else 1) for i in range(1, 11)}  # respuestas ideales -> 100
+    assert c.put(f'/evaluacion/{r["evaluacion_id"]}', json={'juicios': juicios, 'encuesta': {'claridad': 5, **sus}}).status_code == 200
     ex = TestClient(app).get('/admin/exportar', params={'clave': 'clave-prueba'}).json()
     fila = [f for f in ex['evaluaciones'] if f['codigo'] == 'P001'][-1]
     assert set(fila['listas']) == {'popularidad', 'contenido', 'hibrido'} and fila['media_por_lista']['hibrido'] is not None
+    assert fila['sus_puntaje'] == 100.0
     assert TestClient(app).get('/admin/exportar', params={'clave': 'mala'}).status_code == 403
+
+
+def test_puntaje_sus():
+    from app.main import puntaje_sus
+    assert puntaje_sus({f'sus{i}': 3 for i in range(1, 11)}) == 50.0
+    assert puntaje_sus({f'sus{i}': (1 if i % 2 else 5) for i in range(1, 11)}) == 0.0
+    assert puntaje_sus({'sus1': 3}) is None

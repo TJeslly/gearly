@@ -279,9 +279,20 @@ def guardar_evaluacion(eid: str, data: JuiciosIn, p: Perfil = Depends(con_csrf),
         raise HTTPException(422, 'Falta valorar algún producto.')
     if any(v is not None and not 1 <= v <= 5 for v in data.juicios.values()):
         raise HTTPException(422, 'Las valoraciones van de 1 a 5.')
+    sus = [data.encuesta.get(f'sus{i}') for i in range(1, 11)]
+    if any(not isinstance(v, int) or not 1 <= v <= 5 for v in sus):
+        raise HTTPException(422, 'Responde las 10 preguntas de usabilidad (1 a 5).')
     e.juicios = json.dumps(data.juicios); e.encuesta = json.dumps(data.encuesta, ensure_ascii=False); e.terminado = ahora()
     s.commit()
     return {'ok': True}
+
+
+def puntaje_sus(enc: dict):
+    """SUS 0-100 (Brooke, 1996): impares aportan x - 1, pares 5 - x; la suma se multiplica por 2,5."""
+    v = [enc.get(f'sus{i}') for i in range(1, 11)]
+    if any(not isinstance(x, int) for x in v):
+        return None
+    return sum((x - 1) if i % 2 == 0 else (5 - x) for i, x in enumerate(v)) * 2.5
 
 
 @app.get('/admin/exportar')
@@ -294,6 +305,7 @@ def exportar(clave: str = '', s: Session = Depends(db)):
     filas = []
     for e in s.query(Evaluacion).order_by(Evaluacion.creado).all():
         juicios = json.loads(e.juicios) if e.juicios else {}
+        enc = json.loads(e.encuesta) if e.encuesta else {}
         listas = json.loads(e.listas)
         medias = {}
         for m, ids in listas.items():
@@ -301,7 +313,7 @@ def exportar(clave: str = '', s: Session = Depends(db)):
             medias[m] = round(sum(v) / len(v), 3) if v else None
         filas.append({'codigo': e.codigo_participante, 'creado': e.creado.isoformat(), 'terminado': e.terminado.isoformat() if e.terminado else None,
                       'modelo': e.modelo_version, 'perfil': json.loads(e.perfil_congelado), 'listas': listas, 'juicios': juicios,
-                      'media_por_lista': medias, 'encuesta': json.loads(e.encuesta) if e.encuesta else {}})
+                      'media_por_lista': medias, 'encuesta': enc, 'sus_puntaje': puntaje_sus(enc)})
     return {'total': len(filas), 'evaluaciones': filas}
 
 

@@ -10,7 +10,7 @@ Prototipo web que recomienda productos deportivos a **usuarios nuevos** (arranqu
 2. Marca hasta 5 productos que le gusten (con foto y categoría en español). Al marcar uno, ve otros parecidos.
 3. Recibe 10 recomendaciones, cada una con una explicación de por qué aparece.
 4. Puede cambiar sus gustos o empezar de nuevo. Con su código (`G-XXXXXX`) retoma el perfil durante 7 días.
-5. **Evaluación integrada:** con un código de participante (`P001`…), valora de 1 a 5 una mezcla ciega de las listas de popularidad, contenido e híbrido, y responde seis preguntas de experiencia. No hay que copiar nombres a un formulario aparte.
+5. **Evaluación integrada:** con un código de participante (`P001`…), valora de 1 a 5 una mezcla ciega de las listas de popularidad, contenido e híbrido, responde el SUS en español (10 preguntas) y seis preguntas propias de experiencia. La exportación incluye el puntaje SUS de 0 a 100.
 
 ## Estrategias (backend/app/recomendador.py)
 
