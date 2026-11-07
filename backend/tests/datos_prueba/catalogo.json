@@ -1,0 +1,158 @@
+[
+{
+"id": "T000",
+"nombre": "Camiseta running prueba",
+"marca": "Ficticia",
+"disciplina": "running",
+"tipo": "ropa",
+"ruta": [
+"running",
+"ropa"
+],
+"categoria_es": "Camiseta running",
+"imagen": ""
+},
+{
+"id": "T001",
+"nombre": "Cinturón hidratación prueba",
+"marca": "Ficticia",
+"disciplina": "running",
+"tipo": "accesorios",
+"ruta": [
+"running",
+"accesorios"
+],
+"categoria_es": "Cinturón hidratación",
+"imagen": ""
+},
+{
+"id": "T002",
+"nombre": "Medias running prueba",
+"marca": "Ficticia",
+"disciplina": "running",
+"tipo": "ropa",
+"ruta": [
+"running",
+"ropa"
+],
+"categoria_es": "Medias running",
+"imagen": ""
+},
+{
+"id": "T003",
+"nombre": "Luz delantera bici prueba",
+"marca": "Ficticia",
+"disciplina": "ciclismo",
+"tipo": "accesorios",
+"ruta": [
+"ciclismo",
+"accesorios"
+],
+"categoria_es": "Luz delantera bici",
+"imagen": ""
+},
+{
+"id": "T004",
+"nombre": "Luz trasera bici prueba",
+"marca": "Ficticia",
+"disciplina": "ciclismo",
+"tipo": "accesorios",
+"ruta": [
+"ciclismo",
+"accesorios"
+],
+"categoria_es": "Luz trasera bici",
+"imagen": ""
+},
+{
+"id": "T005",
+"nombre": "Casco ruta prueba",
+"marca": "Ficticia",
+"disciplina": "ciclismo",
+"tipo": "proteccion",
+"ruta": [
+"ciclismo",
+"proteccion"
+],
+"categoria_es": "Casco ruta",
+"imagen": ""
+},
+{
+"id": "T006",
+"nombre": "Bomba de aire prueba",
+"marca": "Ficticia",
+"disciplina": "ciclismo",
+"tipo": "equipamiento",
+"ruta": [
+"ciclismo",
+"equipamiento"
+],
+"categoria_es": "Bomba de aire",
+"imagen": ""
+},
+{
+"id": "T007",
+"nombre": "Candado bici prueba",
+"marca": "Ficticia",
+"disciplina": "ciclismo",
+"tipo": "accesorios",
+"ruta": [
+"ciclismo",
+"accesorios"
+],
+"categoria_es": "Candado bici",
+"imagen": ""
+},
+{
+"id": "T008",
+"nombre": "Mancuernas prueba",
+"marca": "Ficticia",
+"disciplina": "entrenamiento",
+"tipo": "equipamiento",
+"ruta": [
+"entrenamiento",
+"equipamiento"
+],
+"categoria_es": "Mancuernas",
+"imagen": ""
+},
+{
+"id": "T009",
+"nombre": "Bandas resistencia prueba",
+"marca": "Ficticia",
+"disciplina": "entrenamiento",
+"tipo": "equipamiento",
+"ruta": [
+"entrenamiento",
+"equipamiento"
+],
+"categoria_es": "Bandas resistencia",
+"imagen": ""
+},
+{
+"id": "T010",
+"nombre": "Guantes gimnasio prueba",
+"marca": "Ficticia",
+"disciplina": "entrenamiento",
+"tipo": "proteccion",
+"ruta": [
+"entrenamiento",
+"proteccion"
+],
+"categoria_es": "Guantes gimnasio",
+"imagen": ""
+},
+{
+"id": "T011",
+"nombre": "Colchoneta yoga prueba",
+"marca": "Ficticia",
+"disciplina": "entrenamiento",
+"tipo": "equipamiento",
+"ruta": [
+"entrenamiento",
+"equipamiento"
+],
+"categoria_es": "Colchoneta yoga",
+"imagen": ""
+}
+]

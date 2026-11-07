@@ -1,0 +1,12 @@
+# Render (plan gratuito). La base de datos va en Neon (gratis y no caduca): pega su URL en DATABASE_URL.
+services:
+  - type: web
+    name: gearly
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/salud
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: ADMIN_CLAVE
+        generateValue: true
