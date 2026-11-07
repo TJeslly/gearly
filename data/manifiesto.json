@@ -1,0 +1,25 @@
+{
+ "semilla": "20261107",
+ "version_modelo": "GEARLY-20261107-L50",
+ "T0": 1563988331199,
+ "T1": 1621538037245,
+ "vecinos_L": 50,
+ "encogimiento": 10,
+ "regla_positiva": "rating >= 4",
+ "protocolo_evaluacion": "v2: usuarios disjuntos, historia completa, apoyo 5, minimo 6",
+ "conteos": {
+  "reseñas_iniciales": 3472020,
+  "tras_primera_reseña_por_par": 3472020,
+  "productos_con_interacciones": 156235,
+  "productos_clasificados": 37646,
+  "excluidos_sin_disciplina": 118582,
+  "excluidos_sin_titulo": 4,
+  "excluidos_sin_imagen": 3,
+  "catalogo_running": 259,
+  "catalogo_ciclismo": 1000,
+  "catalogo_entrenamiento": 1000,
+  "usuarios_entrenamiento_modelo": 90156,
+  "usuarios_validacion": 843,
+  "usuarios_prueba": 840
+ }
+}

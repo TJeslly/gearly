@@ -1,0 +1,170 @@
+{
+ "semilla": 20261107,
+ "K": 10,
+ "usuarios_prueba": 840,
+ "usuarios_validacion": 843,
+ "modelo": "GEARLY-20261107-L50",
+ "alfa_elegido": 0.25,
+ "ajuste_validacion": {
+  "0.25": 0.051779117861394185,
+  "0.5": 0.04668594788213501,
+  "0.75": 0.03554495297146439
+ },
+ "resultados": {
+  "azar_k1": {
+   "ndcg10": 0.002556433068729205
+  },
+  "popularidad_k1": {
+   "ndcg10": 0.01855599170312363,
+   "precision10": 0.009047619047619047,
+   "recall10": 0.03183655054259875,
+   "cobertura": 0.004869411243913236,
+   "listas_completadas_con_popularidad": 0.0
+  },
+  "contenido_k1": {
+   "ndcg10": 0.012963497043683402,
+   "precision10": 0.004880952380952382,
+   "recall10": 0.019097477640710726,
+   "cobertura": 0.7543160690571049,
+   "listas_completadas_con_popularidad": 0.0
+  },
+  "colaborativo_k1": {
+   "ndcg10": 0.023959901129062156,
+   "precision10": 0.008928571428571428,
+   "recall10": 0.03393385690267601,
+   "cobertura": 0.7397078353253652,
+   "listas_completadas_con_popularidad": 0.0
+  },
+  "hibrido_k1": {
+   "ndcg10": 0.02495317708579281,
+   "precision10": 0.008928571428571428,
+   "recall10": 0.03622279267900674,
+   "cobertura": 0.7587428065515714,
+   "listas_completadas_con_popularidad": 0.0
+  },
+  "azar_k3": {
+   "ndcg10": 0.0027175976285160257
+  },
+  "popularidad_k3": {
+   "ndcg10": 0.018618075894240377,
+   "precision10": 0.009047619047619047,
+   "recall10": 0.03183655054259875,
+   "cobertura": 0.005312084993359893,
+   "listas_completadas_con_popularidad": 0.0
+  },
+  "contenido_k3": {
+   "ndcg10": 0.015671773926879375,
+   "precision10": 0.006547619047619048,
+   "recall10": 0.022136799430032512,
+   "cobertura": 0.6861443116423196,
+   "listas_completadas_con_popularidad": 0.0
+  },
+  "colaborativo_k3": {
+   "ndcg10": 0.043748714390887684,
+   "precision10": 0.016547619047619047,
+   "recall10": 0.06655999858537452,
+   "cobertura": 0.5440460380699425,
+   "listas_completadas_con_popularidad": 0.0
+  },
+  "hibrido_k3": {
+   "ndcg10": 0.04310160235620464,
+   "precision10": 0.01607142857142857,
+   "recall10": 0.06491038392824107,
+   "cobertura": 0.5745905267817618,
+   "listas_completadas_con_popularidad": 0.0
+  },
+  "azar_k5": {
+   "ndcg10": 0.002484214241786908
+  },
+  "popularidad_k5": {
+   "ndcg10": 0.01867065971182162,
+   "precision10": 0.009047619047619047,
+   "recall10": 0.03183655054259875,
+   "cobertura": 0.005312084993359893,
+   "listas_completadas_con_popularidad": 0.0
+  },
+  "contenido_k5": {
+   "ndcg10": 0.01881487495443571,
+   "precision10": 0.007738095238095238,
+   "recall10": 0.02848742301279895,
+   "cobertura": 0.6405489154493138,
+   "listas_completadas_con_popularidad": 0.0
+  },
+  "colaborativo_k5": {
+   "ndcg10": 0.0642768149385562,
+   "precision10": 0.023333333333333334,
+   "recall10": 0.09141411700041731,
+   "cobertura": 0.4271801682160248,
+   "listas_completadas_con_popularidad": 0.0
+  },
+  "hibrido_k5": {
+   "ndcg10": 0.06484071038366378,
+   "precision10": 0.023333333333333334,
+   "recall10": 0.0919927480254769,
+   "cobertura": 0.4639220894200974,
+   "listas_completadas_con_popularidad": 0.0
+  }
+ },
+ "diferencias_ndcg10_ic95": {
+  "hibrido-contenido_k1": {
+   "media": 0.011989680042109409,
+   "ic_inf": 0.005315539808417141,
+   "ic_sup": 0.019222351250489756
+  },
+  "hibrido-popularidad_k1": {
+   "media": 0.006397185382669182,
+   "ic_inf": -0.0021861802423146213,
+   "ic_sup": 0.014651364937983191
+  },
+  "hibrido-colaborativo_k1": {
+   "media": 0.0009932759567306572,
+   "ic_inf": -0.001519276642247162,
+   "ic_sup": 0.0036143072188315833
+  },
+  "colaborativo-contenido_k1": {
+   "media": 0.010996404085378754,
+   "ic_inf": 0.0037800638350275573,
+   "ic_sup": 0.018938169332676245
+  },
+  "hibrido-contenido_k3": {
+   "media": 0.027429828429325266,
+   "ic_inf": 0.018727821071967198,
+   "ic_sup": 0.03623879869748968
+  },
+  "hibrido-popularidad_k3": {
+   "media": 0.024483526461964264,
+   "ic_inf": 0.015475096146868202,
+   "ic_sup": 0.03430178029958535
+  },
+  "hibrido-colaborativo_k3": {
+   "media": -0.0006471120346830502,
+   "ic_inf": -0.0031310211840034105,
+   "ic_sup": 0.0017491684891290536
+  },
+  "colaborativo-contenido_k3": {
+   "media": 0.028076940464008316,
+   "ic_inf": 0.018717512534456374,
+   "ic_sup": 0.037297438404228465
+  },
+  "hibrido-contenido_k5": {
+   "media": 0.046025835429228064,
+   "ic_inf": 0.03558392438402006,
+   "ic_sup": 0.057248444049292704
+  },
+  "hibrido-popularidad_k5": {
+   "media": 0.046170050671842155,
+   "ic_inf": 0.035032193894371705,
+   "ic_sup": 0.0578233363088103
+  },
+  "hibrido-colaborativo_k5": {
+   "media": 0.0005638954451075656,
+   "ic_inf": -0.0018292653575138257,
+   "ic_sup": 0.0029235662421342435
+  },
+  "colaborativo-contenido_k5": {
+   "media": 0.0454619399841205,
+   "ic_inf": 0.03484187294097577,
+   "ic_sup": 0.05681146677633768
+  }
+ }
+}

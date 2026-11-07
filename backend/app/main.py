@@ -175,7 +175,8 @@ def retomar(data: RetomarIn, resp: Response, s: Session = Depends(db)):
 
 @app.get('/vocabulario')
 def vocabulario():
-    return {'disciplinas': DISCIPLINAS, 'tipos': TIPOS, 'min_selecciones': MIN_SELECCIONES, 'max_selecciones': MAX_SELECCIONES}
+    conteo = {t: sum(p['tipo'] == t for p in REC.productos.values()) for t in TIPOS}
+    return {'disciplinas': DISCIPLINAS, 'tipos': TIPOS, 'conteo_tipos': conteo, 'min_selecciones': MIN_SELECCIONES, 'max_selecciones': MAX_SELECCIONES}
 
 
 @app.get('/productos')

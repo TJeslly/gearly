@@ -127,13 +127,13 @@ def _ordenar(p: dict, limite: int) -> list[tuple[str, float]]:
 
 
 class Recomendador:
-    def __init__(self, productos: list[dict], modelo: dict, alfa: float = ALFA):
+    def __init__(self, productos: list[dict], modelo: dict, alfa: float | None = None):
         self.productos = {p['id']: p for p in productos}
         self.espacio = EspacioContenido(productos)
         self.popularidad = modelo.get('popularidad', {})
         self.vecinos = {k: [tuple(x) for x in v] for k, v in modelo.get('vecinos', {}).items()}
         self.version = modelo.get('version', 'sin-version')
-        self.alfa = alfa
+        self.alfa = alfa if alfa is not None else modelo.get('alfa', ALFA)  # el experimento guarda el alfa elegido en validación
 
     # --- puntajes por estrategia (también los usa el experimento offline) ---
     def puntajes(self, metodo, disciplinas, tipos, seleccionados, candidatos):

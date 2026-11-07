@@ -15,9 +15,10 @@ Protocolo (capítulo III del documento):
   - Positiva = calificación 4 o 5. Se conserva la primera reseña por par usuario-producto.
   - Usuarios a entrenamiento / validación / prueba por hash con semilla: 70 / 15 / 15 %.
   - T0 = percentil 60 de las fechas; T1 = percentil 80.
-  - El modelo usa solo entrenamiento antes de T0. Validación: eventos [T0, T1). Prueba: eventos >= T1.
-  - Apoyo = primeras 5 positivas distintas del usuario dentro de su ventana y del catálogo;
-    objetivos = positivas posteriores. Se exigen al menos 6 positivas en el catálogo.
+  - El modelo (popularidad y vecinos) usa solo usuarios de entrenamiento y eventos antes de T0.
+  - Protocolo v2: validación y prueba usan toda la historia de sus usuarios (disjuntos del entrenamiento).
+    Apoyo = primeras 5 positivas distintas en el catálogo; objetivos = positivas posteriores; mínimo 6.
+    (v1 exigía eventos posteriores a T0/T1 y dejaba solo 9 usuarios de prueba; T1 queda registrado pero sin uso.)
 """
 import argparse
 import hashlib
@@ -36,6 +37,7 @@ ENCOGIMIENTO = 10
 
 # --- clasificación por ruta de categorías de Amazon -------------------------------------------
 def disciplina(ruta):
+    ruta = [c for c in ruta if not c.startswith(('PD2', 'Holiday', 'Prime Day', 'Gift'))]  # rutas promocionales
     r = ' > '.join(ruta).lower()
     if 'cycling' in r or 'bike' in r:
         return 'ciclismo'
@@ -52,7 +54,8 @@ def tipo(ruta):
         return 'ropa'
     if any(k in r for k in ('helmet', 'protective', 'pads', 'guards', 'braces', 'supports', 'gloves')):
         return 'proteccion'
-    if any(k in r for k in ('accessories', 'lights', 'bags', 'hydration', 'bottles', 'electronics', 'locks', 'mirrors', 'bells', 'computers', 'racks')):
+    if any(k in r for k in ('accessories', 'lights', 'bags', 'hydration', 'bottles', 'electronics', 'locks', 'mirrors', 'bells', 'computers', 'racks',
+                            'packs', 'belts', 'flask', 'armband', 'trackers', 'monitors', 'straps')):
         return 'accesorios'
     return 'equipamiento'
 
@@ -77,7 +80,14 @@ CATEGORIAS_ES = {
     'Weight Lifting Gloves': 'Guantes de levantamiento', 'Wrist Wraps': 'Muñequeras', 'Yoga': 'Yoga', 'Mats': 'Colchonetas', 'Yoga Mats': 'Colchonetas de yoga',
     'Foam Rollers': 'Rodillos de espuma', 'Jump Ropes': 'Cuerdas para saltar', 'Exercise Balls': 'Balones de ejercicio', 'Balance Trainers': 'Equilibrio',
     'Activity & Fitness Trackers': 'Relojes y pulseras de actividad', 'Heart Rate Monitors': 'Monitores de ritmo cardíaco',
-    'Cardio Training': 'Entrenamiento cardiovascular', 'Accessories': 'Accesorios', 'Clothing': 'Ropa', 'Protective Gear': 'Protección',
+    'Cardio Training': 'Entrenamiento cardiovascular', 'Waist Packs': 'Riñoneras para correr', 'Straps': 'Correas',
+    'Exercise Mats': 'Colchonetas de ejercicio', 'Bike Mirrors': 'Espejos para bicicleta', 'Bike Bells': 'Timbres para bicicleta',
+    'Bike Pack Accessories': 'Accesorios para bolsos de bicicleta', 'Gyroscopic Hand Exercise Balls': 'Ejercitadores de mano',
+    'Exercise Machine Attachments': 'Accesorios para máquinas', 'Weights & Accessories': 'Pesas y accesorios', 'Parts & Components': 'Partes y componentes',
+    'Bike Tires': 'Llantas', 'Inner Tubes': 'Neumáticos', 'Cycling Computers': 'Ciclocomputadores', 'Bike Baskets': 'Canastas',
+    'Bike Saddle Bags': 'Bolsos de sillín', 'Bike Trunk Bags': 'Bolsos de portaequipaje', 'Handlebar Bags': 'Bolsos de manubrio',
+    'Hand Grips': 'Ejercitadores de mano', 'Push-Up Stands': 'Soportes para flexiones', 'Ab Rollers & Wheels': 'Ruedas abdominales',
+    'Weight Lifting Belts': 'Cinturones de levantamiento', 'Gloves & Wraps': 'Guantes y vendas', 'Hydration Belts & Packs': 'Cinturones de hidratación', 'Accessories': 'Accesorios', 'Clothing': 'Ropa', 'Protective Gear': 'Protección',
 }
 NOMBRE_TIPO = {'ropa': 'Ropa', 'accesorios': 'Accesorio', 'proteccion': 'Protección', 'equipamiento': 'Equipo'}
 NOMBRE_DISC = {'running': 'running', 'ciclismo': 'ciclismo', 'entrenamiento': 'entrenamiento'}
@@ -124,6 +134,9 @@ def main():
     sin = Counter()
     with open(carpeta / 'meta_Sports_and_Outdoors.jsonl', encoding='utf-8') as f:
         for linea in f:
+            r = linea.rfind('"parent_asin": "')  # filtro rápido antes de interpretar el JSON
+            if r >= 0 and linea[r + 16:linea.find('"', r + 16)] not in asins:
+                continue
             m = json.loads(linea)
             pid = m.get('parent_asin')
             if pid not in asins:
@@ -181,12 +194,12 @@ def main():
     modelo = {'version': version, 'popularidad': {p: int(n_item[p]) for p in cat_ids if n_item[p]}, 'vecinos': vecinos}
     conteos['usuarios_entrenamiento_modelo'] = int(len(por_usuario))
 
-    # 6. evaluación: apoyo (5 primeras positivas) y objetivos (posteriores), mínimo 6 positivas
+    # 6. evaluación (protocolo v2, 7 nov 2026; ver docs/DECISIONES.md): usuarios de validación y prueba,
+    #    disjuntos del entrenamiento, con TODA su historia. Apoyo = 5 primeras positivas en el catálogo;
+    #    objetivos = positivas posteriores. Mínimo 6 positivas. Se decidió con conteos, antes de calcular métricas.
     evaluacion = {}
-    for g, desde, hasta in (('validacion', t0, t1), ('prueba', t1, None)):
-        sub = df[(df.grupo == g) & (df.timestamp >= desde) & df.positiva & df.parent_asin.isin(cat_ids)]
-        if hasta is not None:
-            sub = sub[sub.timestamp < hasta]
+    for g in ('validacion', 'prueba'):
+        sub = df[(df.grupo == g) & df.positiva & df.parent_asin.isin(cat_ids)]
         casos = []
         for u, s in sub.sort_values(['timestamp', 'parent_asin']).groupby('user_id'):
             items = list(dict.fromkeys(s['parent_asin']))
@@ -202,7 +215,7 @@ def main():
     json.dump(modelo, open(RAIZ / 'data/modelo.json', 'w', encoding='utf-8'), ensure_ascii=False)
     json.dump(evaluacion, open(carpeta / 'evaluacion.json', 'w', encoding='utf-8'))
     manifiesto = {'semilla': SEMILLA, 'version_modelo': version, 'T0': t0, 'T1': t1, 'vecinos_L': VECINOS_L,
-                  'encogimiento': ENCOGIMIENTO, 'regla_positiva': 'rating >= 4', 'conteos': conteos}
+                  'encogimiento': ENCOGIMIENTO, 'regla_positiva': 'rating >= 4', 'protocolo_evaluacion': 'v2: usuarios disjuntos, historia completa, apoyo 5, minimo 6', 'conteos': conteos}
     json.dump(manifiesto, open(RAIZ / 'data/manifiesto.json', 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
     print(json.dumps(manifiesto, ensure_ascii=False, indent=1))
 

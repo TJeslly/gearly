@@ -71,10 +71,12 @@ function App() {
   const [lista, setLista] = useState<Lista | null>(null)
   const [error, setError] = useState('')
   const [cargando, setCargando] = useState(false)
+  const [conteoTipos, setConteoTipos] = useState<Record<string, number>>({})
 
   useEffect(() => {
     iniciarSesion().then(e => { setEstado(e); setDisc(e.disciplinas); setTipos(e.tipos); setSel(e.selecciones) })
       .catch(e => setError(e.message))
+    api<{ conteo_tipos: Record<string, number> }>('/vocabulario').then(v => setConteoTipos(v.conteo_tipos)).catch(() => {})
   }, [])
 
   async function accion(f: () => Promise<void>) {
@@ -132,7 +134,7 @@ function App() {
             <h1>¿Qué tipo de producto buscas?</h1>
             <p className="ayuda">Opcional. Si no tienes preferencia, continúa.</p>
             <div className="opciones">
-              {TIPOS.map(t => (
+              {TIPOS.filter(t => conteoTipos[t.id] !== 0).map(t => (
                 <button key={t.id} className={'opcion' + (tipos.includes(t.id) ? ' activa' : '')} aria-pressed={tipos.includes(t.id)} onClick={() => setTipos(alternar(tipos, t.id))}>
                   <b>{t.nombre}</b><span>{t.texto}</span>
                 </button>
@@ -145,7 +147,7 @@ function App() {
           </section>
         )}
 
-        {paso === 'gustos' && <Gustos disc={disc} tipos={tipos} sel={sel} setSel={setSel} atras={() => setPaso('tipos')} ver={verRecomendaciones} cargando={cargando} />}
+        {paso === 'gustos' && <Gustos conteo={conteoTipos} disc={disc} tipos={tipos} sel={sel} setSel={setSel} atras={() => setPaso('tipos')} ver={verRecomendaciones} cargando={cargando} />}
 
         {paso === 'recomendaciones' && lista && (
           <section>
@@ -217,8 +219,8 @@ function Inicio({ continuar, evaluar, retomado }: { continuar: () => void; evalu
   )
 }
 
-function Gustos({ disc, tipos, sel, setSel, atras, ver, cargando }: {
-  disc: string[]; tipos: string[]; sel: Producto[]; setSel: (p: Producto[]) => void; atras: () => void; ver: () => void; cargando: boolean
+function Gustos({ conteo, disc, tipos, sel, setSel, atras, ver, cargando }: {
+  conteo: Record<string, number>; disc: string[]; tipos: string[]; sel: Producto[]; setSel: (p: Producto[]) => void; atras: () => void; ver: () => void; cargando: boolean
 }) {
   const [q, setQ] = useState('')
   const [fd, setFd] = useState<string[]>(disc)
@@ -260,7 +262,7 @@ function Gustos({ disc, tipos, sel, setSel, atras, ver, cargando }: {
         <input type="search" value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar (en inglés o por categoría): casco, light, yoga…" aria-label="Buscar productos" />
         <div className="chips">
           {DISCIPLINAS.map(d => <button key={d.id} className={fd.includes(d.id) ? 'chip activo' : 'chip'} onClick={() => filtro(fd, setFd, d.id)}>{d.nombre}</button>)}
-          {TIPOS.map(t => <button key={t.id} className={ft.includes(t.id) ? 'chip activo' : 'chip'} onClick={() => filtro(ft, setFt, t.id)}>{t.nombre}</button>)}
+          {TIPOS.filter(t => conteo[t.id] !== 0).map(t => <button key={t.id} className={ft.includes(t.id) ? 'chip activo' : 'chip'} onClick={() => filtro(ft, setFt, t.id)}>{t.nombre}</button>)}
         </div>
         <p className="ayuda">{total} productos · los más populares primero</p>
       </div>

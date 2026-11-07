@@ -80,6 +80,8 @@ def main():
         ajuste[alfa] = media([m['ndcg'] for m in evaluar(rec, ev['validacion'], 'hibrido', 3)[0]])
     rec.alfa = max(ajuste, key=lambda a: (ajuste[a], -abs(a - 0.5)))
     print('Ajuste en validación (NDCG@10, k=3):', ajuste, '-> alfa =', rec.alfa)
+    modelo['alfa'] = rec.alfa  # la app usa el mismo alfa elegido en validación
+    json.dump(modelo, open(RAIZ / 'data/modelo.json', 'w', encoding='utf-8'), ensure_ascii=False)
 
     casos = ev['prueba']; res = {}; por_usuario = {}
     for k in (1, 3, 5):
