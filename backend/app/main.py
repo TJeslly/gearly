@@ -249,7 +249,7 @@ def vocabulario():
 
 
 @app.get('/productos')
-def productos(q: str = '', disciplina: str = '', tipo: str = '', pagina: int = Query(1, ge=1), limite: int = Query(24, ge=1, le=60)):
+def productos(q: str = '', disciplina: str = '', tipo: str = '', pagina: int = Query(1, ge=1), limite: int = Query(24, ge=1, le=50)):
     q = q.strip().lower()
     items = [p for p in REC.productos.values()
              if (not disciplina or p['disciplina'] in disciplina.split(',')) and (not tipo or p['tipo'] in tipo.split(','))
