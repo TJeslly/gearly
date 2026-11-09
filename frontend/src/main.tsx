@@ -310,9 +310,10 @@ function Inicio({ estado, continuar, evaluar, retomado, retirado }: { estado: Es
       </div>
       {estado.participacion?.estado === 'activa' && <div className="aviso"><p>Estás participando en la evaluación con el código <b>{estado.participacion.codigo}</b>.</p><Retiro alRetirar={retirado} /></div>}
       <details>
-        <summary>¿Ya tienes un código?</summary>
+        <summary>¿Ya tienes un código de sesión (G-…)?</summary>
         <form className="fila" onSubmit={async e => {
           e.preventDefault(); setMsg('')
+          if (/^\s*P\d+\s*$/i.test(codigo)) { setMsg('Ese es tu código de participante. Escríbelo dentro de «Participar en la evaluación». Aquí va el código de sesión que empieza por G- (lo ves arriba a la derecha).'); return }
           try { retomado(await api<Estado>('/sesiones/retomar', 'POST', { codigo })); setMsg('Perfil recuperado.') } catch (err) { setMsg((err as Error).message) }
         }}>
           <input value={codigo} onChange={e => setCodigo(e.target.value)} placeholder="G-XXXXXX" aria-label="Código" />
