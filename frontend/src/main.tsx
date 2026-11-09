@@ -129,7 +129,7 @@ function App() {
       </header>
       {error && <p className="error" role="alert">{error}</p>}
       <main>
-        {paso === 'inicio' && <Inicio nuevaPersona={nuevaPersona} estado={estado} continuar={() => setPaso('deportes')} evaluar={() => setPaso('participar')} retomado={e => { setEstado(e); setDisc(e.disciplinas); setTipos(e.tipos); setSel(e.selecciones) }} retirado={() => setEstado({ ...estado, participacion: estado.participacion && { ...estado.participacion, estado: 'retirada' } })} />}
+        {paso === 'inicio' && <Inicio nuevaPersona={nuevaPersona} continuarEval={() => (estado.disciplinas.length || estado.selecciones.length) ? verRecomendaciones() : setPaso('deportes')} estado={estado} continuar={() => setPaso('deportes')} evaluar={() => setPaso('participar')} retomado={e => { setEstado(e); setDisc(e.disciplinas); setTipos(e.tipos); setSel(e.selecciones) }} retirado={() => setEstado({ ...estado, participacion: estado.participacion && { ...estado.participacion, estado: 'retirada' } })} />}
         {paso === 'participar' && <Participar listo={part => { setEstado({ ...estado, participacion: part }); if (part?.estado === 'activa') setPaso('deportes') }} />}
 
         {paso === 'deportes' && (
@@ -184,6 +184,12 @@ function App() {
               </div>
             </div>
             {lista.motivo_alternativa && <p className="aviso">{lista.motivo_alternativa}</p>}
+            {estado.participacion?.estado === 'activa' && !estado.participacion.terminada && (
+              <Barra>
+                <span><b>Último paso:</b> valora estas sugerencias (unos 5 minutos)</span>
+                <button className="principal" onClick={() => setPaso('evaluar')}>Evaluar ahora →</button>
+              </Barra>
+            )}
             <div className="rejilla">
               {lista.resultados.map((r, i) => (
                 <Tarjeta key={r.producto.id} p={r.producto}>
@@ -195,7 +201,7 @@ function App() {
           </section>
         )}
 
-        {paso === 'evaluar' && <Evaluar estado={estado} terminar={() => setPaso('gracias')} irAPerfil={() => setPaso('deportes')} />}
+        {paso === 'evaluar' && <Evaluar estado={estado} terminar={() => { setEstado({ ...estado, participacion: estado.participacion && { ...estado.participacion, terminada: true } }); setPaso('gracias') }} irAPerfil={() => setPaso('deportes')} />}
         {paso === 'gracias' && (
           <section className="centro">
             <h1>¡Gracias por participar!</h1>
@@ -296,7 +302,7 @@ function Participar({ listo }: { listo: (p: Estado['participacion']) => void }) 
   )
 }
 
-function Inicio({ nuevaPersona, estado, continuar, evaluar, retomado, retirado }: { nuevaPersona: () => void; estado: Estado; continuar: () => void; evaluar: () => void; retomado: (e: Estado) => void; retirado: () => void }) {
+function Inicio({ nuevaPersona, continuarEval, estado, continuar, evaluar, retomado, retirado }: { nuevaPersona: () => void; continuarEval: () => void; estado: Estado; continuar: () => void; evaluar: () => void; retomado: (e: Estado) => void; retirado: () => void }) {
   const [codigo, setCodigo] = useState('')
   const [msg, setMsg] = useState('')
   return (
@@ -314,7 +320,13 @@ function Inicio({ nuevaPersona, estado, continuar, evaluar, retomado, retirado }
         <button className="principal" onClick={continuar}>Comenzar →</button>
         {(!estado.participacion || estado.participacion.estado === 'excluida') && <button onClick={evaluar}>Participar en la evaluación</button>}
       </div>
-      {estado.participacion?.estado === 'activa' && <div className="aviso"><p>Estás participando en la evaluación con el código <b>{estado.participacion.codigo}</b>.</p><Retiro alRetirar={retirado} /></div>}
+      {estado.participacion?.estado === 'activa' && (
+        <div className="aviso">
+          <p>Estás participando en la evaluación con el código <b>{estado.participacion.codigo}</b>.{estado.participacion.terminada ? ' Ya enviaste tus respuestas. ¡Gracias!' : ' Todavía te falta valorar las sugerencias.'}</p>
+          {!estado.participacion.terminada && <p><button className="principal" onClick={continuarEval}>Continuar mi evaluación →</button></p>}
+          <Retiro alRetirar={retirado} />
+        </div>
+      )}
       {estado.participacion && <p><button onClick={nuevaPersona}>Soy otra persona: empezar de cero</button></p>}
       <details>
         <summary>¿Ya tienes un código de sesión (G-…)?</summary>

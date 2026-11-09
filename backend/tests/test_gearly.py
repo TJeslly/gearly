@@ -127,7 +127,7 @@ def test_h01_invalido(c):
 def test_evaluacion_ciega_y_exportacion(c):
     guardar(c, disciplinas=['entrenamiento'], selecciones=['T008'])
     assert participar(c).json()['estado'] == 'activa'
-    assert c.get('/sesiones/actual').json()['participacion'] == {'codigo': 'P001', 'estado': 'activa'}
+    assert c.get('/sesiones/actual').json()['participacion'] == {'codigo': 'P001', 'estado': 'activa', 'terminada': False}
     c.get('/recomendaciones')
     r = c.post('/evaluacion').json()
     ids = [p['id'] for p in r['productos']]
@@ -137,6 +137,7 @@ def test_evaluacion_ciega_y_exportacion(c):
     assert c.put(f'/evaluacion/{r["evaluacion_id"]}', json={'juicios': juicios, 'encuesta': {'claridad': 5}}).status_code == 422  # falta SUS
     sus = {f'sus{i}': (5 if i % 2 else 1) for i in range(1, 11)}  # respuestas ideales -> 100
     assert c.put(f'/evaluacion/{r["evaluacion_id"]}', json={'juicios': juicios, 'encuesta': {'claridad': 5, **sus}}).status_code == 200
+    assert c.get('/sesiones/actual').json()['participacion']['terminada'] is True
     ex = TestClient(app).get('/admin/exportar', params={'clave': 'clave-prueba'}).json()
     fila = [f for f in ex['evaluaciones'] if f['codigo'] == 'P001'][-1]
     assert set(fila['listas']) == {'popularidad', 'contenido', 'hibrido'} and fila['media_por_lista']['hibrido'] is not None

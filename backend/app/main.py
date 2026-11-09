@@ -182,7 +182,8 @@ def _participacion(s: Session, p: Perfil):
 
 def _estado(p: Perfil, s: Session | None = None):
     part = _participacion(s, p) if s is not None else None
-    return {'codigo': p.codigo, 'participacion': {'codigo': part.codigo_participante, 'estado': part.estado} if part else None, 'version': p.version, 'disciplinas': json.loads(p.disciplinas), 'tipos': json.loads(p.tipos),
+    terminada = bool(part) and s.query(Evaluacion).filter(Evaluacion.participacion_id == part.id, Evaluacion.terminado.isnot(None)).first() is not None
+    return {'codigo': p.codigo, 'participacion': {'codigo': part.codigo_participante, 'estado': part.estado, 'terminada': terminada} if part else None, 'version': p.version, 'disciplinas': json.loads(p.disciplinas), 'tipos': json.loads(p.tipos),
             'selecciones': [REC.productos[i] for i in json.loads(p.selecciones) if i in REC.productos]}
 
 
