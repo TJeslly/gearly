@@ -110,6 +110,10 @@ function App() {
   const reiniciar = () => accion(async () => {
     const e = await api<Estado>('/perfil', 'DELETE'); setEstado(e); setDisc([]); setTipos([]); setSel([]); setLista(null); setPaso('deportes')
   })
+  const nuevaPersona = () => accion(async () => {
+    const e = await api<Estado>('/sesiones', 'POST')  // sesión nueva: reemplaza la cookie de este navegador
+    setEstado(e); setDisc([]); setTipos([]); setSel([]); setLista(null); setPaso('inicio'); window.scrollTo(0, 0)
+  })
   const alternar = <T,>(xs: T[], x: T) => xs.includes(x) ? xs.filter(y => y !== x) : [...xs, x]
 
   if (!estado) return <main className="centro">{error ? <p className="error">{error}</p> : <p>Cargando Gearly… (la primera vez puede tardar un minuto)</p>}</main>
@@ -125,7 +129,7 @@ function App() {
       </header>
       {error && <p className="error" role="alert">{error}</p>}
       <main>
-        {paso === 'inicio' && <Inicio estado={estado} continuar={() => setPaso('deportes')} evaluar={() => setPaso('participar')} retomado={e => { setEstado(e); setDisc(e.disciplinas); setTipos(e.tipos); setSel(e.selecciones) }} retirado={() => setEstado({ ...estado, participacion: estado.participacion && { ...estado.participacion, estado: 'retirada' } })} />}
+        {paso === 'inicio' && <Inicio nuevaPersona={nuevaPersona} estado={estado} continuar={() => setPaso('deportes')} evaluar={() => setPaso('participar')} retomado={e => { setEstado(e); setDisc(e.disciplinas); setTipos(e.tipos); setSel(e.selecciones) }} retirado={() => setEstado({ ...estado, participacion: estado.participacion && { ...estado.participacion, estado: 'retirada' } })} />}
         {paso === 'participar' && <Participar listo={part => { setEstado({ ...estado, participacion: part }); if (part?.estado === 'activa') setPaso('deportes') }} />}
 
         {paso === 'deportes' && (
@@ -198,6 +202,8 @@ function App() {
             <p>Tus respuestas quedaron guardadas con tu código de participante. Ya puedes cerrar esta página.</p>
             <p className="nota">Si cambias de opinión, puedes retirar tus respuestas durante 7 días: entra a Gearly, usa «¿Ya tienes un código?» con <b>{estado.codigo}</b> y pulsa «Retirar mis respuestas».</p>
             <Retiro alRetirar={() => setEstado({ ...estado, participacion: estado.participacion && { ...estado.participacion, estado: 'retirada' } })} />
+            <p className="nota">Si otra persona va a participar en este mismo dispositivo, pulsa:</p>
+            <button className="principal" onClick={nuevaPersona}>Soy otra persona: empezar de cero</button>
           </section>
         )}
       </main>
@@ -290,7 +296,7 @@ function Participar({ listo }: { listo: (p: Estado['participacion']) => void }) 
   )
 }
 
-function Inicio({ estado, continuar, evaluar, retomado, retirado }: { estado: Estado; continuar: () => void; evaluar: () => void; retomado: (e: Estado) => void; retirado: () => void }) {
+function Inicio({ nuevaPersona, estado, continuar, evaluar, retomado, retirado }: { nuevaPersona: () => void; estado: Estado; continuar: () => void; evaluar: () => void; retomado: (e: Estado) => void; retirado: () => void }) {
   const [codigo, setCodigo] = useState('')
   const [msg, setMsg] = useState('')
   return (
@@ -309,6 +315,7 @@ function Inicio({ estado, continuar, evaluar, retomado, retirado }: { estado: Es
         {(!estado.participacion || estado.participacion.estado === 'excluida') && <button onClick={evaluar}>Participar en la evaluación</button>}
       </div>
       {estado.participacion?.estado === 'activa' && <div className="aviso"><p>Estás participando en la evaluación con el código <b>{estado.participacion.codigo}</b>.</p><Retiro alRetirar={retirado} /></div>}
+      {estado.participacion && <p><button onClick={nuevaPersona}>Soy otra persona: empezar de cero</button></p>}
       <details>
         <summary>¿Ya tienes un código de sesión (G-…)?</summary>
         <form className="fila" onSubmit={async e => {
