@@ -39,7 +39,7 @@ const PREGUNTAS = [
   ['pasos', 'La cantidad de pasos me pareció razonable.'],
 ]
 
-type Paso = 'inicio' | 'deportes' | 'tipos' | 'gustos' | 'recomendaciones' | 'evaluar' | 'gracias'
+type Paso = 'inicio' | 'participar' | 'deportes' | 'tipos' | 'gustos' | 'recomendaciones' | 'evaluar' | 'gracias'
 
 function Imagen({ p }: { p: Producto }) {
   const [error, setError] = useState(false)
@@ -104,7 +104,7 @@ function App() {
   }
   const verRecomendaciones = () => accion(async () => {
     await guardar()
-    setLista(await api<Lista>('/recomendaciones?metodo=hibrido'))
+    setLista(await api<Lista>('/recomendaciones'))
     setPaso('recomendaciones'); window.scrollTo(0, 0)
   })
   const reiniciar = () => accion(async () => {
@@ -119,11 +119,14 @@ function App() {
       <header className="cabecera">
         <button className="logo" onClick={() => setPaso('inicio')}>Gearly</button>
         <Pasos paso={paso} ir={setPaso} />
-        <span className="codigo" title="Con este código puedes retomar tu perfil durante 7 días">Tu código: <b>{estado.codigo}</b></span>
+        <span className="codigo" title="Con este código puedes retomar tu perfil durante 7 días">
+          {estado.participacion?.estado === 'activa' && <b className="insignia">Participante {estado.participacion.codigo}</b>} Tu código: <b>{estado.codigo}</b>
+        </span>
       </header>
       {error && <p className="error" role="alert">{error}</p>}
       <main>
-        {paso === 'inicio' && <Inicio continuar={() => setPaso('deportes')} evaluar={() => setPaso('evaluar')} retomado={e => { setEstado(e); setDisc(e.disciplinas); setTipos(e.tipos); setSel(e.selecciones) }} />}
+        {paso === 'inicio' && <Inicio estado={estado} continuar={() => setPaso('deportes')} evaluar={() => setPaso('participar')} retomado={e => { setEstado(e); setDisc(e.disciplinas); setTipos(e.tipos); setSel(e.selecciones) }} retirado={() => setEstado({ ...estado, participacion: estado.participacion && { ...estado.participacion, estado: 'retirada' } })} />}
+        {paso === 'participar' && <Participar listo={part => { setEstado({ ...estado, participacion: part }); if (part?.estado === 'activa') setPaso('deportes') }} />}
 
         {paso === 'deportes' && (
           <section>
@@ -173,7 +176,7 @@ function App() {
               <div className="acciones">
                 <button onClick={() => setPaso('gustos')}>✎ Cambiar mis gustos</button>
                 <button onClick={reiniciar}>Empezar de nuevo</button>
-                <button className="principal" onClick={() => setPaso('evaluar')}>Evaluar estas sugerencias</button>
+                {estado.participacion?.estado === 'activa' && <button className="principal" onClick={() => setPaso('evaluar')}>Evaluar estas sugerencias</button>}
               </div>
             </div>
             {lista.motivo_alternativa && <p className="aviso">{lista.motivo_alternativa}</p>}
@@ -189,7 +192,14 @@ function App() {
         )}
 
         {paso === 'evaluar' && <Evaluar estado={estado} terminar={() => setPaso('gracias')} irAPerfil={() => setPaso('deportes')} />}
-        {paso === 'gracias' && <section className="centro"><h1>¡Gracias por participar!</h1><p>Tus respuestas quedaron guardadas con tu código. Ya puedes cerrar esta página.</p></section>}
+        {paso === 'gracias' && (
+          <section className="centro">
+            <h1>¡Gracias por participar!</h1>
+            <p>Tus respuestas quedaron guardadas con tu código de participante. Ya puedes cerrar esta página.</p>
+            <p className="nota">Si cambias de opinión, puedes retirar tus respuestas durante 7 días: entra a Gearly, usa «¿Ya tienes un código?» con <b>{estado.codigo}</b> y pulsa «Retirar mis respuestas».</p>
+            <Retiro alRetirar={() => setEstado({ ...estado, participacion: estado.participacion && { ...estado.participacion, estado: 'retirada' } })} />
+          </section>
+        )}
       </main>
       <footer>Prototipo académico · Universidad Manuela Beltrán · Datos de productos: Amazon Reviews 2023 (McAuley Lab). No es una tienda.</footer>
     </>
@@ -200,7 +210,87 @@ function Barra({ children }: { children: React.ReactNode }) {
   return <div className="barra">{children}</div>
 }
 
-function Inicio({ continuar, evaluar, retomado }: { continuar: () => void; evaluar: () => void; retomado: (e: Estado) => void }) {
+function Retiro({ alRetirar }: { alRetirar: () => void }) {
+  const [confirmar, setConfirmar] = useState(false)
+  const [msg, setMsg] = useState('')
+  if (msg) return <p className="aviso">{msg}</p>
+  if (!confirmar) return <button onClick={() => setConfirmar(true)}>Retirar mis respuestas</button>
+  return (
+    <div className="aviso">
+      <p>Se borrarán tus valoraciones y respuestas del estudio. Solo quedará constancia de que te retiraste. ¿Continuar?</p>
+      <div className="fila">
+        <button className="principal" onClick={async () => {
+          try { await api('/participacion/retiro', 'POST'); alRetirar(); setMsg('Listo: tus respuestas fueron retiradas del estudio.') } catch (e) { setMsg((e as Error).message) }
+        }}>Sí, retirar</button>
+        <button onClick={() => setConfirmar(false)}>Cancelar</button>
+      </div>
+    </div>
+  )
+}
+
+const H01 = [
+  { k: 'q4_estudiante_umb', t: '¿Eres estudiante de la Universidad Manuela Beltrán?', o: [['si', 'Sí'], ['no', 'No'], ['prefiero_no', 'Prefiero no responder']], obligatoria: true },
+  { k: 'q5_interes_actividad', t: '¿Te interesa al menos una de estas actividades: running, ciclismo o entrenamiento?', o: [['si', 'Sí'], ['no', 'No'], ['no_seguro', 'No estoy seguro']], obligatoria: true },
+  { k: 'q6_edad', t: '¿En qué rango de edad te encuentras? (opcional)', o: [['18_24', '18 a 24'], ['25_34', '25 a 34'], ['35_44', '35 a 44'], ['45_mas', '45 o más'], ['prefiero_no', 'Prefiero no responder']], obligatoria: false },
+  { k: 'q7_frecuencia_catalogos', t: '¿Con qué frecuencia consultas catálogos de productos por internet? (opcional)', o: [['varias_semana', 'Varias veces por semana'], ['una_semana', 'Aproximadamente una vez por semana'], ['algunas_mes', 'Algunas veces al mes'], ['menos', 'Con menor frecuencia'], ['nunca', 'Nunca'], ['prefiero_no', 'Prefiero no responder']], obligatoria: false },
+  { k: 'q8_uso_previo', t: '¿Habías utilizado antes este prototipo de Gearly?', o: [['no', 'No'], ['si_piloto', 'Sí, en un piloto'], ['si_otra', 'Sí, en otra ocasión']], obligatoria: true },
+  { k: 'q9_dispositivo', t: '¿Qué dispositivo estás utilizando?', o: [['movil', 'Teléfono móvil'], ['computador', 'Computador'], ['tableta', 'Tableta'], ['otro', 'Otro']], obligatoria: true },
+] as const
+
+function navegador() {
+  const u = navigator.userAgent
+  return /Edg\//.test(u) ? 'Edge' : /OPR\//.test(u) ? 'Opera' : /Chrome\//.test(u) ? 'Chrome' : /Firefox\//.test(u) ? 'Firefox' : /Safari\//.test(u) ? 'Safari' : 'Otro'
+}
+
+function Participar({ listo }: { listo: (p: Estado['participacion']) => void }) {
+  const [acepta, setAcepta] = useState<boolean | null>(null)
+  const [codigo, setCodigo] = useState('')
+  const [h, setH] = useState<Record<string, string | null>>({ q6_edad: null, q7_frecuencia_catalogos: null })
+  const [fin, setFin] = useState('')
+  const [error, setError] = useState('')
+  const completo = acepta === false || (acepta && /^[A-Za-z0-9-]{2,20}$/.test(codigo.trim()) && H01.filter(q => q.obligatoria).every(q => h[q.k]))
+  if (fin) return <section className="estrecha centro"><h1>Gracias</h1><p>{fin}</p></section>
+  return (
+    <section className="estrecha">
+      <h1>Evaluación académica de Gearly</h1>
+      <div className="consentimiento">
+        <p>Se te invita a participar en una evaluación académica de Gearly, un prototipo que recomienda productos deportivos. Queremos observar si sus instrucciones son comprensibles y qué tan pertinentes te parecen sus sugerencias. Se evalúa el sistema, no tus conocimientos ni tu capacidad. La sesión dura aproximadamente treinta minutos y no incluye compras ni pagos.</p>
+        <p>Participar es voluntario. Puedes omitir preguntas opcionales o terminar la sesión sin consecuencias académicas. Registraremos tus intereses seleccionados, las tareas realizadas y tus valoraciones mediante un código. No se solicitarán credenciales de otras plataformas. Los resultados se presentarán de forma agregada o con comentarios sin datos que permitan identificarte.</p>
+        <p>El riesgo principal es una eventual exposición de la información recogida; se limitará mediante acceso restringido, minimización de datos y separación de contactos. No se promete beneficio económico ni una recomendación perfecta. Puedes solicitar retiro mediante tu código mientras los registros puedan localizarse y antes de su anonimización irreversible.</p>
+        <p>No se grabarán audio, video o pantalla. Aceptar investigación no autoriza publicidad, seguimiento comercial ni reutilización libre de tus respuestas. Tratamiento de datos conforme a la Ley 1581 de 2012.</p>
+      </div>
+      <fieldset className="pregunta"><legend>He leído la información, tengo dieciocho años o más y acepto participar voluntariamente.</legend>
+        <button className={acepta === true ? 'activo' : ''} onClick={() => setAcepta(true)}>Sí acepto</button>
+        <button className={acepta === false ? 'activo' : ''} onClick={() => setAcepta(false)}>No acepto</button>
+      </fieldset>
+      {acepta && (
+        <>
+          <label>Código de participante que te dio el equipo <input value={codigo} onChange={e => setCodigo(e.target.value)} placeholder="P001" /></label>
+          {H01.map(q => (
+            <fieldset key={q.k} className="pregunta"><legend>{q.t}</legend>
+              {q.o.map(([v, t]) => <button key={v} className={h[q.k] === v ? 'activo' : ''} aria-pressed={h[q.k] === v} onClick={() => setH({ ...h, [q.k]: v })}>{t}</button>)}
+            </fieldset>
+          ))}
+        </>
+      )}
+      {error && <p className="error">{error}</p>}
+      <button className="principal" disabled={!completo} onClick={async () => {
+        setError('')
+        try {
+          const r = await api<{ estado: string; codigo?: string }>('/participacion', 'POST', {
+            codigo_participante: codigo.trim() || 'NA', acepta: !!acepta, h01: acepta ? h : {},
+            tecnico: { navegador: navegador(), ancho_pantalla: window.innerWidth, alto_pantalla: window.innerHeight },
+          })
+          if (r.estado === 'no_acepta') setFin('No se guardó ninguna respuesta. Puedes cerrar esta página o explorar Gearly libremente.')
+          else if (r.estado === 'excluida') { listo({ codigo: r.codigo!, estado: 'excluida' }); setFin('Gracias por tu interés. Esta evaluación es para estudiantes de la UMB interesados en running, ciclismo o entrenamiento. Puedes explorar Gearly libremente.') }
+          else listo({ codigo: r.codigo!, estado: 'activa' })
+        } catch (e) { setError((e as Error).message) }
+      }}>{acepta === false ? 'Salir' : 'Continuar a Gearly →'}</button>
+    </section>
+  )
+}
+
+function Inicio({ estado, continuar, evaluar, retomado, retirado }: { estado: Estado; continuar: () => void; evaluar: () => void; retomado: (e: Estado) => void; retirado: () => void }) {
   const [codigo, setCodigo] = useState('')
   const [msg, setMsg] = useState('')
   return (
@@ -216,8 +306,9 @@ function Inicio({ continuar, evaluar, retomado }: { continuar: () => void; evalu
       <p className="nota">No pedimos nombre ni correo. No se vende nada. Los nombres de los productos están en inglés porque vienen de datos públicos de Amazon; mostramos la categoría en español.</p>
       <div className="fila">
         <button className="principal" onClick={continuar}>Comenzar →</button>
-        <button onClick={evaluar}>Participar en la evaluación</button>
+        {!estado.participacion && <button onClick={evaluar}>Participar en la evaluación</button>}
       </div>
+      {estado.participacion?.estado === 'activa' && <div className="aviso"><p>Estás participando en la evaluación con el código <b>{estado.participacion.codigo}</b>.</p><Retiro alRetirar={retirado} /></div>}
       <details>
         <summary>¿Ya tienes un código?</summary>
         <form className="fila" onSubmit={async e => {
@@ -298,8 +389,6 @@ function Gustos({ conteo, disc, tipos, sel, setSel, atras, ver, cargando }: {
 }
 
 function Evaluar({ estado, terminar, irAPerfil }: { estado: Estado; terminar: () => void; irAPerfil: () => void }) {
-  const [acepta, setAcepta] = useState(false)
-  const [codigo, setCodigo] = useState('')
   const [ev, setEv] = useState<{ evaluacion_id: string; productos: Producto[] } | null>(null)
   const [juicios, setJuicios] = useState<Record<string, number | null>>({})
   const [enc, setEnc] = useState<Record<string, number | string | null>>({})
@@ -308,20 +397,13 @@ function Evaluar({ estado, terminar, irAPerfil }: { estado: Estado; terminar: ()
 
   if (!ev) return (
     <section className="estrecha">
-      <h1>Evaluación de Gearly</h1>
-      <p>Vas a valorar qué tan pertinentes te parecen algunos productos según tus intereses y luego responder seis preguntas cortas. Toma unos 10 minutos.</p>
-      <ul className="nota">
-        <li>Participar es voluntario y puedes dejarlo cuando quieras.</li>
-        <li>Debes ser mayor de edad. No pedimos nombre ni correo; tus respuestas se guardan con el código que te dio el equipo.</li>
-        <li>Los datos se usan solo para el trabajo de grado (Ley 1581 de 2012).</li>
-      </ul>
+      <h1>Valoración de sugerencias</h1>
+      <p>Verás algunos productos en orden aleatorio. Valora qué tan pertinente te parece cada uno según tus intereses. Después responderás las preguntas de usabilidad y de experiencia.</p>
       {sinPerfil && <p className="aviso">Primero cuéntanos tus intereses: <button onClick={irAPerfil}>Ir a elegir deportes y productos</button></p>}
-      <label className="check"><input type="checkbox" checked={acepta} onChange={e => setAcepta(e.target.checked)} /> Leí la información y acepto participar.</label>
-      <label>Código de participante <input value={codigo} onChange={e => setCodigo(e.target.value)} placeholder="P001" /></label>
       {error && <p className="error">{error}</p>}
-      <button className="principal" disabled={!acepta || codigo.trim().length < 2 || sinPerfil} onClick={async () => {
-        try { setEv(await api('/evaluacion', 'POST', { codigo_participante: codigo })) } catch (e) { setError((e as Error).message) }
-      }}>Empezar evaluación →</button>
+      <button className="principal" disabled={sinPerfil} onClick={async () => {
+        try { setEv(await api('/evaluacion', 'POST')) } catch (e) { setError((e as Error).message) }
+      }}>Empezar →</button>
     </section>
   )
 

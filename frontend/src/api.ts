@@ -2,7 +2,8 @@ export type Producto = {
   id: string; nombre: string; marca: string; disciplina: string; tipo: string
   categoria_es: string; imagen: string; ruta: string[]
 }
-export type Estado = { codigo: string; version: number; disciplinas: string[]; tipos: string[]; selecciones: Producto[] }
+export type Participacion = { codigo: string; estado: 'activa' | 'excluida' | 'retirada' } | null
+export type Estado = { codigo: string; participacion: Participacion; version: number; disciplinas: string[]; tipos: string[]; selecciones: Producto[] }
 export type Resultado = { producto: Producto; puntaje: number; explicacion: string }
 export type Lista = { lista_id: string; metodo: string; motivo_alternativa: string | null; resultados: Resultado[] }
 

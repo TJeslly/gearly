@@ -25,3 +25,14 @@ Después de la primera corrida v2 se corrigió la asignación de tipo (las riño
 ## SUS en la evaluación (7 de noviembre de 2026)
 
 A pedido del tutor se añadió el **System Usability Scale** en su versión en español validada (Sevilla-González et al., 2020, JMIR Human Factors, CC BY 4.0), con el texto y la instrucción sin modificar. Las 10 preguntas son obligatorias, no admiten «No puedo evaluar» y se responden antes de las seis preguntas propias de Gearly, que se analizan aparte. La exportación calcula el puntaje SUS de 0 a 100 (Brooke, 1996): ítems impares x − 1, pares 5 − x, suma × 2,5.
+
+## Alineación con el documento (9 de noviembre de 2026)
+
+Antes de aplicar la evaluación se cerraron las diferencias entre la especificación del capítulo IV y la aplicación:
+
+- **Estrategia fijada por el estudio:** `GET /recomendaciones` ya no acepta `?metodo=`; siempre usa el híbrido.
+- **Consentimiento C01 y caracterización H01** dentro de la aplicación (`POST /participacion`), antes del recorrido. Si la persona no acepta, no se guarda nada. Si no cumple Q4 o Q5, se registra la exclusión sin datos sustantivos.
+- **Retiro** (`POST /participacion/retiro`): borra valoraciones, encuesta y caracterización, y conserva solo la constancia del retiro. Se puede hacer al terminar o retomando la sesión con su código durante 7 días.
+- **Límite de intentos** al retomar con código: 10 por IP cada 15 minutos (respuesta 429).
+- **Latencia:** cada lista guarda su tiempo de cálculo; la exportación informa p50 y p95.
+- Migración automática de columnas nuevas sobre la base ya publicada.

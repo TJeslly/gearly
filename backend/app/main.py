@@ -10,17 +10,20 @@ import json
 import os
 import random
 import secrets
+import threading
+import time
 import uuid
+from collections import defaultdict, deque
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text, create_engine
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text, create_engine, inspect, text
 from sqlalchemy.orm import Session, declarative_base, sessionmaker
 
-from .recomendador import DISCIPLINAS, METODOS, TIPOS, Recomendador
+from .recomendador import DISCIPLINAS, TIPOS, Recomendador
 
 RAIZ = Path(__file__).resolve().parents[2]
 DATOS = Path(os.getenv('GEARLY_DATOS', RAIZ / 'data'))
@@ -28,6 +31,17 @@ MIN_SELECCIONES, MAX_SELECCIONES = 0, 5
 DIAS_SESION = 7
 TAM_LISTA_EVAL = 5
 METODOS_EVAL = ('popularidad', 'contenido', 'hibrido')
+METODO_PARTICIPANTE = 'hibrido'          # fijado por el estudio; el participante no lo elige
+VERSION_CONSENTIMIENTO = 'C01-v1 (7 nov 2026)'
+H01_OPCIONES = {
+    'q4_estudiante_umb': ('si', 'no', 'prefiero_no'),
+    'q5_interes_actividad': ('si', 'no', 'no_seguro'),
+    'q6_edad': ('18_24', '25_34', '35_44', '45_mas', 'prefiero_no', None),
+    'q7_frecuencia_catalogos': ('varias_semana', 'una_semana', 'algunas_mes', 'menos', 'nunca', 'prefiero_no', None),
+    'q8_uso_previo': ('no', 'si_piloto', 'si_otra'),
+    'q9_dispositivo': ('movil', 'computador', 'tableta', 'otro'),
+}
+LIMITE_RETOMAR = (10, 15 * 60)            # 10 intentos por IP cada 15 minutos
 
 url = os.getenv('DATABASE_URL', f'sqlite:///{RAIZ / "backend" / "gearly.db"}')
 if url.startswith('postgres://'):
@@ -63,7 +77,23 @@ class Lista(Base):
     metodo_resultante = Column(String, nullable=False)
     modelo_version = Column(String, nullable=False)
     productos = Column(Text, nullable=False)
+    latencia_ms = Column(Integer, nullable=True)
     creado = Column(DateTime(timezone=True), nullable=False)
+
+
+class Participacion(Base):
+    """Consentimiento (C01) y caracterización (H01) de un participante del estudio."""
+    __tablename__ = 'participaciones'
+    id = Column(String, primary_key=True)
+    perfil_id = Column(String, ForeignKey('perfiles.id'), nullable=False, index=True)
+    codigo_participante = Column(String, nullable=False)
+    consentimiento_version = Column(String, nullable=False)
+    consentimiento_fecha = Column(DateTime(timezone=True), nullable=False)
+    h01 = Column(Text, nullable=False)
+    tecnico = Column(Text, nullable=False)     # navegador y ancho de pantalla, sin identificadores
+    estado = Column(String, nullable=False)    # activa | excluida | retirada
+    motivo = Column(String, nullable=True)
+    retirado = Column(DateTime(timezone=True), nullable=True)
 
 
 class Evaluacion(Base):
@@ -71,6 +101,7 @@ class Evaluacion(Base):
     id = Column(String, primary_key=True)
     perfil_id = Column(String, ForeignKey('perfiles.id'), nullable=False, index=True)
     codigo_participante = Column(String, nullable=False)
+    participacion_id = Column(String, nullable=True, index=True)
     perfil_congelado = Column(Text, nullable=False)
     listas = Column(Text, nullable=False)      # {metodo: [ids]} — nunca se envía al navegador
     orden = Column(Text, nullable=False)       # unión sin duplicados, en orden aleatorio
@@ -90,8 +121,21 @@ def cargar_datos():
     return Recomendador(catalogo, modelo)
 
 
+def migrar():
+    """Crea tablas nuevas y añade columnas nuevas a tablas existentes (la base publicada ya tiene datos)."""
+    Base.metadata.create_all(engine)
+    insp = inspect(engine)
+    nuevas = {'listas': [('latencia_ms', 'INTEGER')], 'evaluaciones': [('participacion_id', 'VARCHAR')]}
+    with engine.begin() as con:
+        for tabla, cols in nuevas.items():
+            existentes = {c['name'] for c in insp.get_columns(tabla)}
+            for nombre, tipo in cols:
+                if nombre not in existentes:
+                    con.execute(text(f'ALTER TABLE {tabla} ADD COLUMN {nombre} {tipo}'))
+
+
 REC = cargar_datos()
-Base.metadata.create_all(engine)
+migrar()
 app = FastAPI(title='Gearly API', version='1.0.0')
 
 
@@ -132,8 +176,13 @@ def _poner_cookie(resp: Response, token: str):
                     secure=os.getenv('COOKIE_SEGURA', '0') == '1')
 
 
-def _estado(p: Perfil):
-    return {'codigo': p.codigo, 'version': p.version, 'disciplinas': json.loads(p.disciplinas), 'tipos': json.loads(p.tipos),
+def _participacion(s: Session, p: Perfil):
+    return s.query(Participacion).filter_by(perfil_id=p.id).order_by(Participacion.consentimiento_fecha.desc()).first()
+
+
+def _estado(p: Perfil, s: Session | None = None):
+    part = _participacion(s, p) if s is not None else None
+    return {'codigo': p.codigo, 'participacion': {'codigo': part.codigo_participante, 'estado': part.estado} if part else None, 'version': p.version, 'disciplinas': json.loads(p.disciplinas), 'tipos': json.loads(p.tipos),
             'selecciones': [REC.productos[i] for i in json.loads(p.selecciones) if i in REC.productos]}
 
 
@@ -154,15 +203,35 @@ def nueva_sesion(resp: Response, s: Session = Depends(db)):
 
 
 @app.get('/sesiones/actual')
-def sesion_actual(p: Perfil = Depends(sesion)):
-    return {'csrf': p.csrf, **_estado(p)}
+def sesion_actual(p: Perfil = Depends(sesion), s: Session = Depends(db)):
+    return {'csrf': p.csrf, **_estado(p, s)}
 
 
 class RetomarIn(BaseModel):
     codigo: str = Field(min_length=3, max_length=20)
 
 
-@app.post('/sesiones/retomar')
+_intentos: dict[str, deque] = defaultdict(deque)
+_cerrojo = threading.Lock()
+
+
+def _ip(request: Request) -> str:
+    return (request.headers.get('X-Forwarded-For', '').split(',')[0].strip() or (request.client.host if request.client else '?'))
+
+
+def limitar_retomar(request: Request):
+    n, ventana = LIMITE_RETOMAR
+    t = time.monotonic(); clave = _hash(_ip(request))
+    with _cerrojo:
+        q = _intentos[clave]
+        while q and t - q[0] > ventana:
+            q.popleft()
+        if len(q) >= n:
+            raise HTTPException(429, 'Demasiados intentos. Espera unos minutos e inténtalo de nuevo.')
+        q.append(t)
+
+
+@app.post('/sesiones/retomar', dependencies=[Depends(limitar_retomar)])
 def retomar(data: RetomarIn, resp: Response, s: Session = Depends(db)):
     p = s.query(Perfil).filter_by(codigo=data.codigo.strip().upper()).first()
     if not p or _utc(p.expira) < ahora():
@@ -170,7 +239,7 @@ def retomar(data: RetomarIn, resp: Response, s: Session = Depends(db)):
     token = secrets.token_urlsafe(32)
     p.token_hash = _hash(token); p.csrf = secrets.token_urlsafe(24); s.commit()
     _poner_cookie(resp, token)
-    return {'csrf': p.csrf, **_estado(p)}
+    return {'csrf': p.csrf, **_estado(p, s)}
 
 
 @app.get('/vocabulario')
@@ -213,7 +282,7 @@ def guardar_perfil(data: PerfilIn, p: Perfil = Depends(con_csrf), s: Session = D
     p.disciplinas = json.dumps(sorted(set(data.disciplinas))); p.tipos = json.dumps(sorted(set(data.tipos)))
     p.selecciones = json.dumps(data.selecciones); p.version += 1
     s.commit()
-    return _estado(p)
+    return _estado(p, s)
 
 
 @app.delete('/perfil')
@@ -221,7 +290,7 @@ def borrar_perfil(p: Perfil = Depends(con_csrf), s: Session = Depends(db)):
     p = s.merge(p)
     p.disciplinas = p.tipos = p.selecciones = '[]'; p.version += 1
     s.commit()
-    return _estado(p)
+    return _estado(p, s)
 
 
 def _calcular(p, metodo, limite):
@@ -229,12 +298,14 @@ def _calcular(p, metodo, limite):
 
 
 @app.get('/recomendaciones')
-def recomendaciones(metodo: str = 'hibrido', p: Perfil = Depends(sesion), s: Session = Depends(db)):
-    if metodo not in METODOS:
-        raise HTTPException(422, 'Método no válido.')
+def recomendaciones(p: Perfil = Depends(sesion), s: Session = Depends(db)):
+    """La estrategia la fija el estudio (híbrido); no se acepta como parámetro de la URL."""
+    metodo = METODO_PARTICIPANTE
+    t0 = time.perf_counter()
     r = _calcular(p, metodo, 10)
+    latencia = round((time.perf_counter() - t0) * 1000)
     lista = Lista(id=str(uuid.uuid4()), perfil_id=p.id, perfil_version=p.version, metodo_solicitado=metodo, metodo_resultante=r['metodo'],
-                  modelo_version=REC.version, productos=json.dumps([x['producto']['id'] for x in r['resultados']]), creado=ahora())
+                  modelo_version=REC.version, productos=json.dumps([x['producto']['id'] for x in r['resultados']]), latencia_ms=latencia, creado=ahora())
     s.add(lista); s.commit()
     return {'lista_id': lista.id, 'metodo': r['metodo'], 'motivo_alternativa': r['motivo_alternativa'], 'resultados': r['resultados']}
 
@@ -247,17 +318,58 @@ def parecidos(de: str, excluir: str = '', p: Perfil = Depends(sesion)):
 
 
 # ------------------------------------------------------------------ evaluación formativa (H03 y H04 dentro de la app)
-class EvalIn(BaseModel):
-    codigo_participante: str = Field(min_length=2, max_length=20)
+class ParticipacionIn(BaseModel):
+    codigo_participante: str = Field(min_length=2, max_length=20, pattern=r'^[A-Za-z0-9-]+$')
+    acepta: bool
+    h01: dict[str, str | None]
+    tecnico: dict[str, str | int | None] = {}
+
+
+@app.post('/participacion')
+def registrar_participacion(data: ParticipacionIn, p: Perfil = Depends(con_csrf), s: Session = Depends(db)):
+    """C01 y H01. Si no acepta, no se guarda nada. Las respuestas de exclusión se registran sin datos sustantivos."""
+    if not data.acepta:
+        return {'estado': 'no_acepta'}
+    for k, ops in H01_OPCIONES.items():
+        v = data.h01.get(k)
+        if v not in ops:
+            raise HTTPException(422, f'Respuesta no válida en {k}.')
+    if any(k not in H01_OPCIONES for k in data.h01):
+        raise HTTPException(422, 'Pregunta desconocida.')
+    excluida = data.h01['q4_estudiante_umb'] != 'si' or data.h01['q5_interes_actividad'] != 'si'
+    tecnico = {k: data.tecnico.get(k) for k in ('navegador', 'ancho_pantalla', 'alto_pantalla')}
+    part = Participacion(id=str(uuid.uuid4()), perfil_id=p.id, codigo_participante=data.codigo_participante.strip().upper(),
+                         consentimiento_version=VERSION_CONSENTIMIENTO, consentimiento_fecha=ahora(),
+                         h01=json.dumps(data.h01 if not excluida else {k: data.h01[k] for k in ('q4_estudiante_umb', 'q5_interes_actividad')}),
+                         tecnico=json.dumps(tecnico if not excluida else {}), estado='excluida' if excluida else 'activa',
+                         motivo='criterio de inclusión (Q4 o Q5)' if excluida else None)
+    s.add(part); s.commit()
+    return {'estado': part.estado, 'codigo': part.codigo_participante}
+
+
+@app.post('/participacion/retiro')
+def retirar(p: Perfil = Depends(con_csrf), s: Session = Depends(db)):
+    """Retiro del estudio: borra juicios, encuesta y caracterización; conserva solo la constancia del retiro."""
+    part = _participacion(s, p)
+    if not part or part.estado == 'retirada':
+        raise HTTPException(404, 'No hay una participación activa en esta sesión.')
+    for e in s.query(Evaluacion).filter_by(perfil_id=p.id).all():
+        s.delete(e)
+    part.estado = 'retirada'; part.retirado = ahora(); part.h01 = '{}'; part.tecnico = '{}'
+    s.commit()
+    return {'estado': 'retirada'}
 
 
 @app.post('/evaluacion')
-def iniciar_evaluacion(data: EvalIn, p: Perfil = Depends(con_csrf), s: Session = Depends(db)):
-    """Congela el perfil, genera POP, CONT e HIB (5 cada una), une sin duplicados y mezcla. El navegador no ve el método."""
+def iniciar_evaluacion(p: Perfil = Depends(con_csrf), s: Session = Depends(db)):
+    """Requiere participación activa. Congela el perfil, genera POP, CONT e HIB (5 cada una), une y mezcla. El navegador no ve el método."""
+    part = _participacion(s, p)
+    if not part or part.estado != 'activa':
+        raise HTTPException(409, 'Primero registra tu participación (consentimiento y preguntas iniciales).')
     listas = {m: [x['producto']['id'] for x in _calcular(p, m, TAM_LISTA_EVAL)['resultados']] for m in METODOS_EVAL}
     union = sorted({i for ids in listas.values() for i in ids})
     random.Random(p.id + str(p.version)).shuffle(union)
-    e = Evaluacion(id=str(uuid.uuid4()), perfil_id=p.id, codigo_participante=data.codigo_participante.strip().upper(),
+    e = Evaluacion(id=str(uuid.uuid4()), perfil_id=p.id, codigo_participante=part.codigo_participante, participacion_id=part.id,
                    perfil_congelado=json.dumps(_estado(p) | {'selecciones': json.loads(p.selecciones)}), listas=json.dumps(listas),
                    orden=json.dumps(union), modelo_version=REC.version, creado=ahora())
     s.add(e); s.commit()
@@ -303,7 +415,9 @@ def exportar(clave: str = '', s: Session = Depends(db)):
     if not secrets.compare_digest(clave, esperada):
         raise HTTPException(403, 'Clave inválida')
     filas = []
+    parts = {x.id: x for x in s.query(Participacion).all()}
     for e in s.query(Evaluacion).order_by(Evaluacion.creado).all():
+        part = parts.get(e.participacion_id)
         juicios = json.loads(e.juicios) if e.juicios else {}
         enc = json.loads(e.encuesta) if e.encuesta else {}
         listas = json.loads(e.listas)
@@ -313,8 +427,16 @@ def exportar(clave: str = '', s: Session = Depends(db)):
             medias[m] = round(sum(v) / len(v), 3) if v else None
         filas.append({'codigo': e.codigo_participante, 'creado': e.creado.isoformat(), 'terminado': e.terminado.isoformat() if e.terminado else None,
                       'modelo': e.modelo_version, 'perfil': json.loads(e.perfil_congelado), 'listas': listas, 'juicios': juicios,
-                      'media_por_lista': medias, 'encuesta': enc, 'sus_puntaje': puntaje_sus(enc)})
-    return {'total': len(filas), 'evaluaciones': filas}
+                      'media_por_lista': medias, 'encuesta': enc, 'sus_puntaje': puntaje_sus(enc),
+                      'consentimiento': part.consentimiento_version if part else None, 'h01': json.loads(part.h01) if part else None,
+                      'tecnico': json.loads(part.tecnico) if part else None})
+    lat = sorted(x for (x,) in s.query(Lista.latencia_ms).filter(Lista.latencia_ms.isnot(None)).all())
+    pct = lambda q: lat[min(len(lat) - 1, int(q * len(lat)))] if lat else None
+    estados = defaultdict(int)
+    for x in parts.values():
+        estados[x.estado] += 1
+    return {'total': len(filas), 'participaciones': dict(estados),
+            'latencia_recomendaciones_ms': {'n': len(lat), 'p50': pct(0.5), 'p95': pct(0.95)}, 'evaluaciones': filas}
 
 
 # ------------------------------------------------------------------ servicio único: API en /api y la interfaz compilada en /

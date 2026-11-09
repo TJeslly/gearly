@@ -80,3 +80,8 @@ footer { text-align: center; color: var(--suave); font-size: .8rem; padding: 20p
   .barra { flex-wrap: wrap; }
   .barra .principal { flex: 1; }
 }
+.insignia { background: var(--acento-suave); color: var(--acento); padding: 3px 8px; border-radius: 999px; margin-right: 6px; }
+.consentimiento { background: #fff; border: 1px solid var(--linea); border-radius: 12px; padding: 4px 16px; max-height: 320px; overflow-y: auto; font-size: .95rem; }
+.pregunta { border: 1px solid var(--linea); border-radius: 12px; padding: 12px; display: flex; gap: 6px; flex-wrap: wrap; background: #fff; margin: 12px 0; }
+.pregunta legend { font-weight: 600; padding: 0 4px; }
+.pregunta .activo { background: var(--marca); color: #fff; border-color: var(--marca); }

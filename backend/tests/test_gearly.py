@@ -47,7 +47,7 @@ def test_alfa_extremos_igualan_estrategias():
 
 
 def test_sin_sesion_401():
-    assert TestClient(app).get('/perfil' if False else '/recomendaciones').status_code == 401
+    assert TestClient(app).get('/recomendaciones').status_code == 401
 
 
 def test_sin_csrf_403(c):
@@ -78,14 +78,49 @@ def test_retomar_con_codigo(c):
     guardar(c, disciplinas=['running'])
     codigo = c.get('/sesiones/actual').json()['codigo']
     otro = TestClient(app)
+    otro.headers['X-Forwarded-For'] = '10.1.1.1'
     r = otro.post('/sesiones/retomar', json={'codigo': codigo})
     assert r.status_code == 200 and r.json()['disciplinas'] == ['running']
     assert otro.post('/sesiones/retomar', json={'codigo': 'G-NOPE00'}).status_code == 404
 
 
+H01_OK = {'q4_estudiante_umb': 'si', 'q5_interes_actividad': 'si', 'q6_edad': '18_24', 'q7_frecuencia_catalogos': None,
+          'q8_uso_previo': 'no', 'q9_dispositivo': 'movil'}
+
+
+def participar(c, codigo='p001', **h01):
+    return c.post('/participacion', json={'codigo_participante': codigo, 'acepta': True, 'h01': {**H01_OK, **h01},
+                                           'tecnico': {'navegador': 'Chrome', 'ancho_pantalla': 390}})
+
+
+def test_estrategia_no_se_elige_desde_url(c):
+    guardar(c, disciplinas=['ciclismo'], selecciones=['T003'])
+    r = c.get('/recomendaciones', params={'metodo': 'popularidad'}).json()
+    assert r['metodo'] == 'hibrido'
+
+
+def test_sin_consentimiento_no_guarda_nada(c):
+    r = c.post('/participacion', json={'codigo_participante': 'p050', 'acepta': False, 'h01': {}})
+    assert r.json()['estado'] == 'no_acepta'
+    assert c.get('/sesiones/actual').json()['participacion'] is None
+    assert c.post('/evaluacion').status_code == 409
+
+
+def test_exclusion_por_criterio(c):
+    assert participar(c, 'p051', q4_estudiante_umb='no').json()['estado'] == 'excluida'
+    assert c.post('/evaluacion').status_code == 409
+
+
+def test_h01_invalido(c):
+    assert participar(c, 'p052', q9_dispositivo='nevera').status_code == 422
+
+
 def test_evaluacion_ciega_y_exportacion(c):
     guardar(c, disciplinas=['entrenamiento'], selecciones=['T008'])
-    r = c.post('/evaluacion', json={'codigo_participante': 'p001'}).json()
+    assert participar(c).json()['estado'] == 'activa'
+    assert c.get('/sesiones/actual').json()['participacion'] == {'codigo': 'P001', 'estado': 'activa'}
+    c.get('/recomendaciones')
+    r = c.post('/evaluacion').json()
     ids = [p['id'] for p in r['productos']]
     assert len(ids) == len(set(ids)) and 'metodo' not in str(r)
     assert c.put(f'/evaluacion/{r["evaluacion_id"]}', json={'juicios': {ids[0]: 5}}).status_code == 422
@@ -96,8 +131,27 @@ def test_evaluacion_ciega_y_exportacion(c):
     ex = TestClient(app).get('/admin/exportar', params={'clave': 'clave-prueba'}).json()
     fila = [f for f in ex['evaluaciones'] if f['codigo'] == 'P001'][-1]
     assert set(fila['listas']) == {'popularidad', 'contenido', 'hibrido'} and fila['media_por_lista']['hibrido'] is not None
-    assert fila['sus_puntaje'] == 100.0
+    assert fila['sus_puntaje'] == 100.0 and fila['h01']['q9_dispositivo'] == 'movil' and fila['consentimiento'].startswith('C01')
+    assert ex['latencia_recomendaciones_ms']['n'] >= 1
     assert TestClient(app).get('/admin/exportar', params={'clave': 'mala'}).status_code == 403
+
+
+def test_retiro_borra_respuestas(c):
+    guardar(c, disciplinas=['ciclismo'], selecciones=['T003'])
+    participar(c, 'p060')
+    r = c.post('/evaluacion').json()
+    sus = {f'sus{i}': 3 for i in range(1, 11)}
+    c.put(f'/evaluacion/{r["evaluacion_id"]}', json={'juicios': {p['id']: 3 for p in r['productos']}, 'encuesta': sus})
+    assert c.post('/participacion/retiro').json()['estado'] == 'retirada'
+    ex = TestClient(app).get('/admin/exportar', params={'clave': 'clave-prueba'}).json()
+    assert not [f for f in ex['evaluaciones'] if f['codigo'] == 'P060']
+    assert c.post('/participacion/retiro').status_code == 404
+
+
+def test_limite_intentos_retomar():
+    cl = TestClient(app)
+    codigos = [cl.post('/sesiones/retomar', json={'codigo': f'G-X{i:04d}'}, headers={'X-Forwarded-For': '10.9.9.9'}).status_code for i in range(12)]
+    assert codigos[:10] == [404] * 10 and codigos[10] == 429
 
 
 def test_puntaje_sus():
