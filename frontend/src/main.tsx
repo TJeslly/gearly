@@ -229,7 +229,7 @@ function Retiro({ alRetirar }: { alRetirar: () => void }) {
 }
 
 const H01 = [
-  { k: 'q4_estudiante_umb', t: '¿Eres estudiante de la Universidad Manuela Beltrán?', o: [['si', 'Sí'], ['no', 'No'], ['prefiero_no', 'Prefiero no responder']], obligatoria: true },
+  { k: 'q4_relacion', t: '¿Qué relación tienes con el equipo de Gearly?', o: [['companero_umb', 'Compañero/a de la UMB'], ['amigo', 'Amigo/a'], ['familiar', 'Familiar'], ['otro', 'Otra']], obligatoria: true },
   { k: 'q5_interes_actividad', t: '¿Te interesa al menos una de estas actividades: running, ciclismo o entrenamiento?', o: [['si', 'Sí'], ['no', 'No'], ['no_seguro', 'No estoy seguro']], obligatoria: true },
   { k: 'q6_edad', t: '¿En qué rango de edad te encuentras? (opcional)', o: [['18_24', '18 a 24'], ['25_34', '25 a 34'], ['35_44', '35 a 44'], ['45_mas', '45 o más'], ['prefiero_no', 'Prefiero no responder']], obligatoria: false },
   { k: 'q7_frecuencia_catalogos', t: '¿Con qué frecuencia consultas catálogos de productos por internet? (opcional)', o: [['varias_semana', 'Varias veces por semana'], ['una_semana', 'Aproximadamente una vez por semana'], ['algunas_mes', 'Algunas veces al mes'], ['menos', 'Con menor frecuencia'], ['nunca', 'Nunca'], ['prefiero_no', 'Prefiero no responder']], obligatoria: false },
@@ -282,7 +282,7 @@ function Participar({ listo }: { listo: (p: Estado['participacion']) => void }) 
             tecnico: { navegador: navegador(), ancho_pantalla: window.innerWidth, alto_pantalla: window.innerHeight },
           })
           if (r.estado === 'no_acepta') setFin('No se guardó ninguna respuesta. Puedes cerrar esta página o explorar Gearly libremente.')
-          else if (r.estado === 'excluida') { listo({ codigo: r.codigo!, estado: 'excluida' }); setFin('Gracias por tu interés. Esta evaluación es para estudiantes de la UMB interesados en running, ciclismo o entrenamiento. Puedes explorar Gearly libremente.') }
+          else if (r.estado === 'excluida') { listo({ codigo: r.codigo!, estado: 'excluida' }); setFin('Gracias por tu interés. Esta evaluación es para personas interesadas en running, ciclismo o entrenamiento. Puedes explorar Gearly libremente.') }
           else listo({ codigo: r.codigo!, estado: 'activa' })
         } catch (e) { setError((e as Error).message) }
       }}>{acepta === false ? 'Salir' : 'Continuar a Gearly →'}</button>
@@ -306,7 +306,7 @@ function Inicio({ estado, continuar, evaluar, retomado, retirado }: { estado: Es
       <p className="nota">No pedimos nombre ni correo. No se vende nada. Los nombres de los productos están en inglés porque vienen de datos públicos de Amazon; mostramos la categoría en español.</p>
       <div className="fila">
         <button className="principal" onClick={continuar}>Comenzar →</button>
-        {!estado.participacion && <button onClick={evaluar}>Participar en la evaluación</button>}
+        {(!estado.participacion || estado.participacion.estado === 'excluida') && <button onClick={evaluar}>Participar en la evaluación</button>}
       </div>
       {estado.participacion?.estado === 'activa' && <div className="aviso"><p>Estás participando en la evaluación con el código <b>{estado.participacion.codigo}</b>.</p><Retiro alRetirar={retirado} /></div>}
       <details>

@@ -32,9 +32,9 @@ DIAS_SESION = 7
 TAM_LISTA_EVAL = 5
 METODOS_EVAL = ('popularidad', 'contenido', 'hibrido')
 METODO_PARTICIPANTE = 'hibrido'          # fijado por el estudio; el participante no lo elige
-VERSION_CONSENTIMIENTO = 'C01-v1 (7 nov 2026)'
+VERSION_CONSENTIMIENTO = 'C01-v2 (9 nov 2026)'
 H01_OPCIONES = {
-    'q4_estudiante_umb': ('si', 'no', 'prefiero_no'),
+    'q4_relacion': ('companero_umb', 'amigo', 'familiar', 'otro'),
     'q5_interes_actividad': ('si', 'no', 'no_seguro'),
     'q6_edad': ('18_24', '25_34', '35_44', '45_mas', 'prefiero_no', None),
     'q7_frecuencia_catalogos': ('varias_semana', 'una_semana', 'algunas_mes', 'menos', 'nunca', 'prefiero_no', None),
@@ -336,13 +336,13 @@ def registrar_participacion(data: ParticipacionIn, p: Perfil = Depends(con_csrf)
             raise HTTPException(422, f'Respuesta no válida en {k}.')
     if any(k not in H01_OPCIONES for k in data.h01):
         raise HTTPException(422, 'Pregunta desconocida.')
-    excluida = data.h01['q4_estudiante_umb'] != 'si' or data.h01['q5_interes_actividad'] != 'si'
+    excluida = data.h01['q5_interes_actividad'] == 'no'  # muestra: adultos cercanos al equipo con interés en las actividades
     tecnico = {k: data.tecnico.get(k) for k in ('navegador', 'ancho_pantalla', 'alto_pantalla')}
     part = Participacion(id=str(uuid.uuid4()), perfil_id=p.id, codigo_participante=data.codigo_participante.strip().upper(),
                          consentimiento_version=VERSION_CONSENTIMIENTO, consentimiento_fecha=ahora(),
-                         h01=json.dumps(data.h01 if not excluida else {k: data.h01[k] for k in ('q4_estudiante_umb', 'q5_interes_actividad')}),
+                         h01=json.dumps(data.h01 if not excluida else {k: data.h01[k] for k in ('q4_relacion', 'q5_interes_actividad')}),
                          tecnico=json.dumps(tecnico if not excluida else {}), estado='excluida' if excluida else 'activa',
-                         motivo='criterio de inclusión (Q4 o Q5)' if excluida else None)
+                         motivo='sin interés en las actividades (Q5)' if excluida else None)
     s.add(part); s.commit()
     return {'estado': part.estado, 'codigo': part.codigo_participante}
 

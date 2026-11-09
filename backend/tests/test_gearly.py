@@ -84,7 +84,7 @@ def test_retomar_con_codigo(c):
     assert otro.post('/sesiones/retomar', json={'codigo': 'G-NOPE00'}).status_code == 404
 
 
-H01_OK = {'q4_estudiante_umb': 'si', 'q5_interes_actividad': 'si', 'q6_edad': '18_24', 'q7_frecuencia_catalogos': None,
+H01_OK = {'q4_relacion': 'amigo', 'q5_interes_actividad': 'si', 'q6_edad': '18_24', 'q7_frecuencia_catalogos': None,
           'q8_uso_previo': 'no', 'q9_dispositivo': 'movil'}
 
 
@@ -107,11 +107,17 @@ def test_sin_consentimiento_no_guarda_nada(c):
 
 
 def test_exclusion_por_criterio(c):
-    assert participar(c, 'p051', q4_estudiante_umb='no').json()['estado'] == 'excluida'
+    assert participar(c, 'p051', q5_interes_actividad='no').json()['estado'] == 'excluida'
     assert c.post('/evaluacion').status_code == 409
     ex = TestClient(app).get('/admin/exportar', params={'clave': 'clave-prueba'}).json()
     fila = [x for x in ex['participantes'] if x['codigo'] == 'P051'][0]
-    assert fila['estado'] == 'excluida' and fila['h01']['q4_estudiante_umb'] == 'no' and fila['evaluacion_terminada'] is False
+    assert fila['estado'] == 'excluida' and fila['h01']['q5_interes_actividad'] == 'no' and fila['evaluacion_terminada'] is False
+
+
+def test_no_estar_seguro_no_excluye_y_reintento_tras_exclusion(c):
+    assert participar(c, 'p053', q5_interes_actividad='no').json()['estado'] == 'excluida'
+    assert participar(c, 'p053', q4_relacion='familiar', q5_interes_actividad='no_seguro').json()['estado'] == 'activa'
+    assert c.get('/sesiones/actual').json()['participacion']['estado'] == 'activa'
 
 
 def test_h01_invalido(c):

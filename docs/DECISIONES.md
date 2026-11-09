@@ -36,3 +36,7 @@ Antes de aplicar la evaluación se cerraron las diferencias entre la especificac
 - **Límite de intentos** al retomar con código: 10 por IP cada 15 minutos (respuesta 429).
 - **Latencia:** cada lista guarda su tiempo de cálculo; la exportación informa p50 y p95.
 - Migración automática de columnas nuevas sobre la base ya publicada.
+
+## Cambio de población (9 de noviembre de 2026)
+
+La muestra pasa de «estudiantes de la UMB» a **adultos cercanos al equipo: compañeros de la UMB, amigos y familiares**, con interés en running, ciclismo o entrenamiento. Q4 ya no excluye: registra la relación con el equipo para analizarla. Solo excluye responder «No» en Q5. Consentimiento C01-v2. Quien quedó excluido con la regla anterior puede registrarse de nuevo. Limitación: muestra por conveniencia con posible sesgo de complacencia; se informará la relación de cada participante.
