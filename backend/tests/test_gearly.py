@@ -109,6 +109,9 @@ def test_sin_consentimiento_no_guarda_nada(c):
 def test_exclusion_por_criterio(c):
     assert participar(c, 'p051', q4_estudiante_umb='no').json()['estado'] == 'excluida'
     assert c.post('/evaluacion').status_code == 409
+    ex = TestClient(app).get('/admin/exportar', params={'clave': 'clave-prueba'}).json()
+    fila = [x for x in ex['participantes'] if x['codigo'] == 'P051'][0]
+    assert fila['estado'] == 'excluida' and fila['h01']['q4_estudiante_umb'] == 'no' and fila['evaluacion_terminada'] is False
 
 
 def test_h01_invalido(c):

@@ -435,7 +435,11 @@ def exportar(clave: str = '', s: Session = Depends(db)):
     estados = defaultdict(int)
     for x in parts.values():
         estados[x.estado] += 1
-    return {'total': len(filas), 'participaciones': dict(estados),
+    con_eval = {e.participacion_id for e in s.query(Evaluacion).filter(Evaluacion.terminado.isnot(None)).all()}
+    detalle = [{'codigo': x.codigo_participante, 'fecha': x.consentimiento_fecha.isoformat(), 'estado': x.estado, 'motivo': x.motivo,
+                'h01': json.loads(x.h01), 'evaluacion_terminada': x.id in con_eval}
+               for x in sorted(parts.values(), key=lambda x: x.consentimiento_fecha)]
+    return {'total': len(filas), 'participaciones': dict(estados), 'participantes': detalle,
             'latencia_recomendaciones_ms': {'n': len(lat), 'p50': pct(0.5), 'p95': pct(0.95)}, 'evaluaciones': filas}
 
 
