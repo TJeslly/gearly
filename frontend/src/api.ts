@@ -5,7 +5,7 @@ export type Producto = {
 export type Participacion = { codigo: string; estado: 'activa' | 'excluida' | 'retirada'; terminada?: boolean } | null
 export type Estado = { codigo: string; participacion: Participacion; version: number; disciplinas: string[]; tipos: string[]; selecciones: Producto[] }
 export type Resultado = { producto: Producto; puntaje: number; explicacion: string }
-export type Lista = { lista_id: string; metodo: string; motivo_alternativa: string | null; resultados: Resultado[] }
+export type Lista = { lista_id: string; metodo: string; motivo_alternativa: string | null; resultados: Resultado[]; modelo_version?: string; perfil_version?: number }
 
 let csrf = ''
 

@@ -200,3 +200,10 @@ def test_activar_modelo_solo_si_es_compatible():
 def test_documentacion_openapi_disponible():
     r = TestClient(app).get('/openapi.json')
     assert r.status_code == 200 and '/recomendaciones' in r.json()['paths'] and '/admin/modelos/activar' in r.json()['paths']
+
+
+def test_lista_informa_metodo_orden_y_version(c):
+    assert guardar(c, disciplinas=['ciclismo'], tipos=[], selecciones=[]).status_code == 200
+    r = c.get('/recomendaciones').json()
+    assert r['modelo_version'] == 'PRUEBA' and r['perfil_version'] >= 1 and r['metodo'] == 'contenido'
+    assert len(r['resultados']) >= 1

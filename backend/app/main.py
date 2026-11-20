@@ -358,7 +358,7 @@ def recomendaciones(p: Perfil = Depends(sesion), s: Session = Depends(db)):
     lista = Lista(id=str(uuid.uuid4()), perfil_id=p.id, perfil_version=p.version, metodo_solicitado=metodo, metodo_resultante=r['metodo'],
                   modelo_version=REC.version, productos=json.dumps([x['producto']['id'] for x in r['resultados']]), latencia_ms=latencia, creado=ahora())
     s.add(lista); s.commit()
-    return {'lista_id': lista.id, 'metodo': r['metodo'], 'motivo_alternativa': r['motivo_alternativa'], 'resultados': r['resultados']}
+    return {'lista_id': lista.id, 'metodo': r['metodo'], 'motivo_alternativa': r['motivo_alternativa'], 'resultados': r['resultados'], 'modelo_version': lista.modelo_version, 'perfil_version': lista.perfil_version}
 
 
 @app.get('/parecidos')
