@@ -1,0 +1,38 @@
+classDiagram
+  direction TB
+  class Catalogo {
+    <<data/catalogo.json>>
+    +id: parent_asin
+    +nombre, marca
+    +disciplina: running | ciclismo | entrenamiento
+    +tipo: ropa | accesorios | proteccion | equipamiento
+    +categoria_es, ruta, imagen
+  }
+  class Modelo {
+    <<data/modelo.json · data/modelos/*.json>>
+    +version: GEARLY-20261107-L50
+    +popularidad: Map id → usuarios positivos
+    +vecinos: Map id → 50 pares (id, similitud)
+    +alfa: 0,25
+  }
+  class Manifiesto {
+    <<data/manifiesto.json>>
+    +fuente, revisión, huellas SHA-256
+    +cortes T0 y T1, semilla
+    +conteos de limpieza y particiones
+  }
+  class Ajuste {
+    <<tabla ajustes>>
+    +clave: modelo_activo
+    +valor: versión
+    +actualizado
+  }
+  class Lista {
+    <<tabla listas>>
+    +modelo_version
+    +metodo_resultante
+  }
+  Modelo ..> Catalogo : solo ids del catálogo publicado
+  Manifiesto ..> Modelo : describe cómo se generó
+  Ajuste ..> Modelo : apunta a la versión activa
+  Lista ..> Modelo : registra la versión usada

@@ -1,0 +1,24 @@
+sequenceDiagram
+  autonumber
+  actor O as Equipo (operador)
+  participant S as Scripts de preparación
+  participant G as GitHub + Render
+  participant A as API (Registro de modelos)
+  participant B as PostgreSQL
+  O->>S: Ejecuta preparar_datos.py con nuevo catálogo o datos
+  S-->>O: catalogo.json, modelo.json con nueva versión, manifiesto
+  O->>S: experimento_offline.py (α en validación, métricas en prueba)
+  O->>G: Guarda la versión en data/modelos/ y publica (git push)
+  G-->>A: Nuevo despliegue: el modelo activo sigue igual
+  O->>A: GET /api/admin/modelos con la clave
+  A-->>O: Versión activa, huella del catálogo, versiones y problemas
+  O->>A: POST /api/admin/modelos/activar con la versión
+  A->>A: Revisa campos, α y que todos los ids estén en el catálogo
+  alt Incompatible
+    A-->>O: 409 con la lista de problemas (no cambia nada)
+  else Compatible
+    A->>A: Carga el modelo en memoria y lo usa para nuevas listas
+    A->>B: Guarda ajustes.modelo_activo
+    A-->>O: 200 estado actualizado
+  end
+  Note over A,B: Cada lista y evaluación guarda modelo_version,<br/>así se sabe qué versión vio cada persona

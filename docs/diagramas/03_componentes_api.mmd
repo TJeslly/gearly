@@ -1,0 +1,28 @@
+flowchart TB
+  subgraph API["API FastAPI (prefijo /api)"]
+    direction LR
+    SEG["Seguridad<br/>cookie HttpOnly · CSRF · límite de intentos ·<br/>clave de administración · validación Pydantic"]
+    R1["Rutas de sesión<br/>POST /sesiones · GET /sesiones/actual ·<br/>POST /sesiones/retomar"]
+    R2["Rutas de catálogo y perfil<br/>GET /vocabulario · GET /productos ·<br/>PUT y DELETE /perfil"]
+    R3["Rutas de recomendación<br/>GET /recomendaciones · GET /parecidos"]
+    R4["Rutas del estudio<br/>POST /participacion · POST /participacion/retiro ·<br/>POST /evaluacion · PUT /evaluacion/{id}"]
+    R5["Rutas de administración<br/>GET /admin/exportar · GET /admin/modelos ·<br/>POST /admin/modelos/activar"]
+    REG["Registro de modelos<br/>lista versiones, revisa compatibilidad<br/>con el catálogo y activa"]
+    PER["Persistencia<br/>SQLAlchemy: Perfil, Lista, Participacion,<br/>Evaluacion, Ajuste"]
+  end
+  subgraph MOT["Motor de recomendación (recomendador.py)"]
+    direction LR
+    POP["POP<br/>conteo de usuarios positivos"]
+    CON["CONT · EspacioContenido<br/>TF-IDF en 3 grupos + coseno"]
+    CF["CF<br/>vecinos producto-producto<br/>coseno con encogimiento, L = 50"]
+    HIB["HIB<br/>α·CONT + (1 − α)·CF, α = 0,25"]
+    EXP["Explicación de cada resultado"]
+  end
+  SEG --> R1 & R2 & R3 & R4 & R5
+  R3 --> HIB
+  R4 --> POP & CON & HIB
+  HIB --> CON & CF
+  R3 --> EXP
+  R5 --> REG
+  REG -- "reemplaza el motor activo" --> MOT
+  R1 & R2 & R3 & R4 & R5 --> PER

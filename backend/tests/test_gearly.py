@@ -169,3 +169,34 @@ def test_puntaje_sus():
     assert puntaje_sus({f'sus{i}': 3 for i in range(1, 11)}) == 50.0
     assert puntaje_sus({f'sus{i}': (1 if i % 2 else 5) for i in range(1, 11)}) == 0.0
     assert puntaje_sus({'sus1': 3}) is None
+
+
+def test_activar_modelo_solo_si_es_compatible():
+    import json
+    from app import main
+    cl = TestClient(app)
+    assert cl.get('/admin/modelos?clave=mala').status_code == 403
+    estado = cl.get('/admin/modelos?clave=clave-prueba').json()
+    assert estado['activo'] == 'PRUEBA' and estado['disponibles'][0]['problemas'] == []
+    carpeta = main.DATOS / 'modelos'; carpeta.mkdir(exist_ok=True)
+    base = json.load(open(main.DATOS / 'modelo.json'))
+    malo = dict(base, version='PRUEBA-MALO', popularidad={**base['popularidad'], 'NO-EXISTE': 3})
+    bueno = dict(base, version='PRUEBA-2', alfa=0.5)
+    try:
+        json.dump(malo, open(carpeta / 'malo.json', 'w')); json.dump(bueno, open(carpeta / 'bueno.json', 'w'))
+        r = cl.post('/admin/modelos/activar?clave=clave-prueba', json={'version': 'PRUEBA-MALO'})
+        assert r.status_code == 409
+        assert cl.post('/admin/modelos/activar?clave=clave-prueba', json={'version': 'NO-HAY'}).status_code == 404
+        r = cl.post('/admin/modelos/activar?clave=clave-prueba', json={'version': 'PRUEBA-2'})
+        assert r.status_code == 200 and r.json()['activo'] == 'PRUEBA-2' and main.REC.alfa == 0.5
+    finally:
+        cl.post('/admin/modelos/activar?clave=clave-prueba', json={'version': 'PRUEBA'})
+        for f in carpeta.glob('*.json'):
+            f.unlink()
+        carpeta.rmdir()
+    assert main.REC.version == 'PRUEBA'
+
+
+def test_documentacion_openapi_disponible():
+    r = TestClient(app).get('/openapi.json')
+    assert r.status_code == 200 and '/recomendaciones' in r.json()['paths'] and '/admin/modelos/activar' in r.json()['paths']

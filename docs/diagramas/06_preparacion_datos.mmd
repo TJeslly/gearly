@@ -1,0 +1,15 @@
+flowchart TB
+  D1["descargar_datos.py<br/>CSV 5-core y metadatos JSONL<br/>revisión fija y huella SHA-256"] --> D2
+  D2["preparar_datos.py · validar<br/>campos, faltantes, fechas,<br/>duplicados e identificadores"] --> D3
+  D3["Depurar y clasificar<br/>positiva = calificación 4 o 5<br/>disciplina y tipo por ruta de categorías<br/>excluir sin título o sin imagen"] --> D4
+  D4["Particiones por hash de usuario<br/>70 % entrenamiento · 15 % validación · 15 % prueba<br/>semilla 20261107 · corte T0 = 24/07/2019"]
+  D4 --> E1["Entrenamiento (antes de T0)<br/>90.156 usuarios"]
+  D4 --> E2["Validación<br/>843 usuarios"]
+  D4 --> E3["Prueba<br/>840 usuarios"]
+  E1 --> M1["Catálogo de 2.259 productos<br/>POP y vecinos CF (L = 50)<br/>→ catalogo.json, modelo.json, manifiesto.json"]
+  E2 --> X1["experimento_offline.py<br/>elegir α en validación (0,25 · 0,50 · 0,75)"]
+  M1 --> X1
+  X1 --> X2["Prueba: 5 primeras positivas = apoyo<br/>k = 1, 3 y 5 visibles · resto = objetivos<br/>listas de 5 y 10 · mismos usuarios para todos"]
+  E3 --> X2
+  X2 --> X3["NDCG, Precision y Recall por usuario<br/>bootstrap 2.000 · IC 95 %<br/>cobertura, listas vacías, tiempo y memoria"]
+  X3 --> R["docs/resultados_offline.json<br/>docs/RESULTADOS_OFFLINE.md"]

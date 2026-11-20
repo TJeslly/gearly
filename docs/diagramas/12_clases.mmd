@@ -1,0 +1,93 @@
+classDiagram
+direction TB
+class Perfil {
+  +id: String «PK»
+  +token_hash: String «único»
+  +csrf: String
+  +codigo: String «G-XXXXXX»
+  +disciplinas: List~disciplina~
+  +tipos: List~tipo~
+  +selecciones: List~producto_id~ «máx. 5»
+  +version: int
+  +expira: DateTime
+}
+class Lista {
+  +id: String «PK»
+  +perfil_version: int
+  +metodo_solicitado: String
+  +metodo_resultante: String
+  +modelo_version: String
+  +productos: List~producto_id~
+  +latencia_ms: int
+}
+class Participacion {
+  +id: String «PK»
+  +codigo_participante: String
+  +consentimiento_version: String
+  +consentimiento_fecha: DateTime
+  +h01: JSON
+  +tecnico: JSON
+  +estado: activa | excluida | retirada
+}
+class Evaluacion {
+  +id: String «PK»
+  +participacion_id: String «FK»
+  +perfil_congelado: JSON
+  +listas: Map~metodo, ids~
+  +orden: List~producto_id~
+  +juicios: Map~id, 1..5 o nulo~
+  +encuesta: JSON
+}
+class Producto {
+  <<catálogo JSON>>
+  +id: String «parent_asin»
+  +nombre: String
+  +marca: String
+  +disciplina: String
+  +tipo: String
+  +categoria_es: String
+  +imagen: URL
+}
+class Recomendador {
+  <<servicio>>
+  +alfa: float = 0,25
+  +recomendar(metodo, disciplinas, tipos, seleccionados) Resultado
+  +puntajes(metodo, ...) Map
+  +explicar(producto, metodo) String
+  +parecidos(semilla) List
+}
+class EspacioContenido {
+  +vec: Map~id, vector TF-IDF~
+  +perfil(disciplinas, tipos, seleccionados) vector
+  +puntajes(perfil, candidatos) Map
+}
+class ModeloCongelado {
+  <<data/modelo.json y data/modelos/*.json>>
+  +version: GEARLY-20261107-L50
+  +popularidad: Map
+  +vecinos: Map «L = 50»
+  +alfa: float
+}
+Perfil "1" --> "0..*" Lista : recibe
+Perfil "1" --> "0..*" Participacion : registra
+Participacion "1" --> "0..*" Evaluacion : responde
+Perfil ..> Producto : selecciona
+Lista ..> Recomendador : producida por
+Evaluacion ..> Recomendador : POP, CONT, HIB
+class Ajuste {
+  +clave: String «PK» = modelo_activo
+  +valor: String «versión»
+  +actualizado: DateTime
+}
+class RegistroModelos {
+  <<servicio>>
+  +modelos_disponibles() Map~version, archivo~
+  +revisar_compatibilidad(modelo, catalogo) List~problema~
+  +activar(version) Estado
+}
+RegistroModelos ..> ModeloCongelado : revisa y carga
+RegistroModelos ..> Ajuste : guarda versión activa
+RegistroModelos ..> Recomendador : reemplaza el activo
+Recomendador *-- EspacioContenido
+Recomendador ..> ModeloCongelado : carga
+Recomendador ..> Producto : ordena

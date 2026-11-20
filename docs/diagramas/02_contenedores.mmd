@@ -1,0 +1,20 @@
+flowchart TB
+  subgraph NAV["Navegador del participante"]
+    SPA["Interfaz web<br/><i>React 18 + TypeScript + Vite</i><br/>pasos, tarjetas, evaluación y SUS"]
+  end
+  subgraph REN["Servicio web en Render · contenedor Docker"]
+    API["API REST<br/><i>Python 3.13 + FastAPI + SQLAlchemy</i><br/>sesiones, perfil, recomendaciones,<br/>evaluación y administración"]
+    REC["Motor de recomendación<br/><i>módulo Python en memoria</i><br/>POP · CONT · CF · HIB"]
+    ART[("Artefactos versionados<br/>data/catalogo.json · data/modelo.json<br/>data/modelos/*.json · manifiesto.json")]
+  end
+  DB[("PostgreSQL en Neon<br/>perfiles, listas, participaciones,<br/>evaluaciones y ajustes")]
+  subgraph OFF["Entorno de preparación (fuera de línea)"]
+    SCR["Scripts Python<br/>descargar_datos · preparar_datos ·<br/>experimento_offline"]
+    RAW[("Datos crudos de Amazon<br/>CSV 5-core + metadatos JSONL<br/>no se publican")]
+  end
+  SPA -- "HTTPS · JSON<br/>cookie HttpOnly + cabecera X-CSRF" --> API
+  API --> REC
+  REC -- "carga al iniciar o al activar" --> ART
+  API -- "SQL sobre TLS<br/>DATABASE_URL como secreto" --> DB
+  RAW --> SCR
+  SCR -- "genera y versiona en Git" --> ART

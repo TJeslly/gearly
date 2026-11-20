@@ -112,11 +112,55 @@ class Evaluacion(Base):
     terminado = Column(DateTime(timezone=True), nullable=True)
 
 
-def cargar_datos():
+class Ajuste(Base):
+    """Configuración persistente; guarda la versión de modelo activada por el operador."""
+    __tablename__ = 'ajustes'
+    clave = Column(String, primary_key=True)
+    valor = Column(Text, nullable=False)
+    actualizado = Column(DateTime(timezone=True), nullable=False)
+
+
+def _leer(ruta: Path):
+    return json.load(open(ruta, encoding='utf-8'))
+
+
+def huella_catalogo(catalogo: list[dict]) -> str:
+    return hashlib.sha256(','.join(sorted(p['id'] for p in catalogo)).encode()).hexdigest()[:16]
+
+
+def modelos_disponibles() -> dict[str, Path]:
+    """Versiones de modelo guardadas: data/modelo.json (versión inicial) y data/modelos/*.json."""
+    rutas = [DATOS / 'modelo.json'] + sorted((DATOS / 'modelos').glob('*.json'))
+    out = {}
+    for r in rutas:
+        try:
+            out[_leer(r).get('version', r.stem)] = r
+        except (FileNotFoundError, json.JSONDecodeError):
+            continue
+    return out
+
+
+def revisar_compatibilidad(modelo: dict, catalogo: list[dict]) -> list[str]:
+    """Problemas que impiden activar un modelo con el catálogo publicado (lista vacía = compatible)."""
+    problemas = [f'falta el campo {c}' for c in ('version', 'popularidad', 'vecinos', 'alfa') if c not in modelo]
+    if problemas:
+        return problemas
+    ids = {p['id'] for p in catalogo}
+    ajenos = {k for k in modelo['popularidad'] if k not in ids} | {k for k in modelo['vecinos'] if k not in ids}
+    ajenos |= {v for vs in modelo['vecinos'].values() for v, *_ in vs if v not in ids}
+    if ajenos:
+        problemas.append(f'{len(ajenos)} productos del modelo no están en el catálogo publicado')
+    if not 0 <= float(modelo['alfa']) <= 1:
+        problemas.append('alfa fuera de [0, 1]')
+    return problemas
+
+
+def cargar_datos(version: str | None = None):
     try:
-        catalogo = json.load(open(DATOS / 'catalogo.json', encoding='utf-8'))
-        modelo = json.load(open(DATOS / 'modelo.json', encoding='utf-8'))
-    except FileNotFoundError:
+        catalogo = _leer(DATOS / 'catalogo.json')
+        ruta = modelos_disponibles().get(version) if version else DATOS / 'modelo.json'
+        modelo = _leer(ruta)
+    except (FileNotFoundError, TypeError):
         catalogo, modelo = [], {'version': 'sin-datos'}
     return Recomendador(catalogo, modelo)
 
@@ -136,6 +180,12 @@ def migrar():
 
 REC = cargar_datos()
 migrar()
+CATALOGO_PUBLICADO = _leer(DATOS / 'catalogo.json') if (DATOS / 'catalogo.json').exists() else []
+with SessionLocal() as _s:  # al reiniciar se conserva la versión activada, si sigue siendo compatible
+    _a = _s.get(Ajuste, 'modelo_activo')
+    if _a and _a.valor != REC.version and _a.valor in modelos_disponibles() \
+            and not revisar_compatibilidad(_leer(modelos_disponibles()[_a.valor]), CATALOGO_PUBLICADO):
+        REC = cargar_datos(_a.valor)
 app = FastAPI(title='Gearly API', version='1.0.0')
 
 
@@ -410,11 +460,7 @@ def puntaje_sus(enc: dict):
 
 @app.get('/admin/exportar')
 def exportar(clave: str = '', s: Session = Depends(db)):
-    esperada = os.getenv('ADMIN_CLAVE', '')
-    if not esperada:
-        raise HTTPException(404, 'No disponible')
-    if not secrets.compare_digest(clave, esperada):
-        raise HTTPException(403, 'Clave inválida')
+    _clave_admin(clave)
     filas = []
     parts = {x.id: x for x in s.query(Participacion).all()}
     for e in s.query(Evaluacion).order_by(Evaluacion.creado).all():
@@ -442,6 +488,53 @@ def exportar(clave: str = '', s: Session = Depends(db)):
                for x in sorted(parts.values(), key=lambda x: x.consentimiento_fecha)]
     return {'total': len(filas), 'participaciones': dict(estados), 'participantes': detalle,
             'latencia_recomendaciones_ms': {'n': len(lat), 'p50': pct(0.5), 'p95': pct(0.95)}, 'evaluaciones': filas}
+
+
+def _clave_admin(clave: str):
+    esperada = os.getenv('ADMIN_CLAVE', '')
+    if not esperada:
+        raise HTTPException(404, 'No disponible')
+    if not secrets.compare_digest(clave, esperada):
+        raise HTTPException(403, 'Clave inválida')
+
+
+def _estado_modelos():
+    disponibles = []
+    for version, ruta in modelos_disponibles().items():
+        m = _leer(ruta)
+        disponibles.append({'version': version, 'archivo': str(ruta.relative_to(DATOS)), 'alfa': m.get('alfa'),
+                            'productos_con_vecinos': len(m.get('vecinos', {})), 'problemas': revisar_compatibilidad(m, CATALOGO_PUBLICADO)})
+    return {'activo': REC.version, 'alfa_activo': REC.alfa, 'catalogo': {'productos': len(CATALOGO_PUBLICADO), 'huella': huella_catalogo(CATALOGO_PUBLICADO)},
+            'disponibles': disponibles}
+
+
+@app.get('/admin/modelos')
+def estado_modelos(clave: str = ''):
+    """RF20: estado de los artefactos de recomendación y su compatibilidad con el catálogo publicado."""
+    _clave_admin(clave)
+    return _estado_modelos()
+
+
+class ActivarIn(BaseModel):
+    version: str = Field(min_length=1, max_length=80)
+
+
+@app.post('/admin/modelos/activar')
+def activar_modelo(data: ActivarIn, clave: str = '', s: Session = Depends(db)):
+    """RF20: activa una versión guardada solo si es compatible; las listas nuevas registran la versión activa."""
+    global REC
+    _clave_admin(clave)
+    rutas = modelos_disponibles()
+    if data.version not in rutas:
+        raise HTTPException(404, 'Versión de modelo no encontrada')
+    problemas = revisar_compatibilidad(_leer(rutas[data.version]), CATALOGO_PUBLICADO)
+    if problemas:
+        raise HTTPException(409, 'Modelo incompatible con el catálogo publicado: ' + '; '.join(problemas))
+    REC = cargar_datos(data.version)
+    a = s.get(Ajuste, 'modelo_activo') or Ajuste(clave='modelo_activo')
+    a.valor = data.version; a.actualizado = ahora()
+    s.merge(a); s.commit()
+    return _estado_modelos()
 
 
 # ------------------------------------------------------------------ servicio único: API en /api y la interfaz compilada en /

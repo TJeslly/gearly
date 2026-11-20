@@ -1,0 +1,58 @@
+erDiagram
+  PERFILES ||--o{ LISTAS : "recibe"
+  PERFILES ||--o{ PARTICIPACIONES : "registra"
+  PERFILES ||--o{ EVALUACIONES : "responde"
+  PARTICIPACIONES ||--o{ EVALUACIONES : "autoriza"
+  PERFILES {
+    string id PK "UUID"
+    string token_hash UK "SHA-256 del token de la cookie"
+    string csrf
+    string codigo UK "G-XXXXXX para retomar"
+    text disciplinas "JSON, vocabulario válido"
+    text tipos "JSON"
+    text selecciones "JSON, 0 a 5 productos"
+    int version "aumenta con cada cambio"
+    datetime creado
+    datetime expira "7 días"
+  }
+  LISTAS {
+    string id PK
+    string perfil_id FK
+    int perfil_version
+    string metodo_solicitado
+    string metodo_resultante "método realmente usado"
+    string modelo_version "versión de artefactos"
+    text productos "JSON, 10 ids en orden"
+    int latencia_ms
+    datetime creado
+  }
+  PARTICIPACIONES {
+    string id PK
+    string perfil_id FK
+    string codigo_participante "P0XX"
+    string consentimiento_version "C01-v2"
+    datetime consentimiento_fecha
+    text h01 "JSON"
+    text tecnico "navegador y pantalla"
+    string estado "activa, excluida o retirada"
+    string motivo
+    datetime retirado
+  }
+  EVALUACIONES {
+    string id PK
+    string perfil_id FK
+    string participacion_id FK
+    text perfil_congelado "JSON"
+    text listas "POP, CONT, HIB; no va al navegador"
+    text orden "unión aleatoria"
+    text juicios "1 a 5 o nulo"
+    text encuesta "SUS y H04"
+    string modelo_version
+    datetime creado
+    datetime terminado
+  }
+  AJUSTES {
+    string clave PK "modelo_activo"
+    text valor "versión activada"
+    datetime actualizado
+  }

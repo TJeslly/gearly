@@ -1,0 +1,19 @@
+flowchart TB
+  S([Entrar a Gearly]) --> A1["Sesión anónima<br/>código G-XXXXXX"]
+  A1 --> Q{"¿Quiere participar<br/>en el estudio?"}
+  Q -- No --> F1
+  Q -- Sí --> C1["Leer y aceptar C01<br/>responder H01"]
+  C1 --> Q5{"Q5: ¿le interesa alguna<br/>actividad?"}
+  Q5 -- No --> EX["Excluida: se registra<br/>sin presión"] --> F1
+  Q5 -- "Sí / no estoy seguro" --> F1
+  F1["Paso 1: deportes"] --> F2["Paso 2: tipos de producto"]
+  F2 --> F3["Paso 3: marcar 0 a 5 productos"]
+  F3 --> F4["Paso 4: 10 recomendaciones HIB<br/>explicadas"]
+  F4 --> CM{"¿Cambiar gustos?"}
+  CM -- Sí --> F1
+  CM -- No --> EV{"¿Participación activa?"}
+  EV -- No --> FIN([Fin])
+  EV -- Sí --> H3["Evaluar: unión ciega de POP, CONT e HIB<br/>orden aleatorio, 1 a 5 o «No puedo valorar»"]
+  H3 --> SUS["SUS (10 ítems obligatorios)<br/>y preguntas H04"]
+  SUS --> FIN
+  FIN -.-> RT["Puede retirar sus respuestas<br/>en cualquier momento"]

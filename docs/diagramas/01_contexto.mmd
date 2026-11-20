@@ -1,0 +1,10 @@
+flowchart LR
+  P(["Participante<br/>persona adulta, usuario nuevo"])
+  E(["Equipo investigador<br/>operador con clave de administración"])
+  G["<b>Gearly 1.0</b><br/>Prototipo web de recomendación<br/>de productos deportivos"]
+  A[("Amazon Reviews 2023<br/>McAuley Lab · Hugging Face<br/>Sports and Outdoors")]
+  I["Servidores de imágenes<br/>de Amazon"]
+  P -- "HTTPS: declara intereses, marca 0 a 5 productos,<br/>recibe 10 recomendaciones y evalúa" --> G
+  E -- "HTTPS: exporta evaluaciones,<br/>consulta y activa versiones del modelo" --> G
+  A -. "Descarga única y preparación<br/>fuera de línea (scripts Python)" .-> G
+  G -. "El navegador muestra la imagen<br/>enlazada, sin copiarla" .-> I

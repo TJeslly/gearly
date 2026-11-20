@@ -1,0 +1,18 @@
+flowchart TB
+  subgraph DEV["Equipo"]
+    GH["Repositorio GitHub<br/>TJeslly/gearly (público)<br/>código + artefactos"]
+    LOC["Equipo local<br/>SQLite y scripts de preparación"]
+  end
+  subgraph RENDER["Render · plan gratuito"]
+    WEB["Servicio web Docker<br/>uvicorn: API /api + interfaz compilada /<br/>variables secretas: DATABASE_URL, ADMIN_CLAVE"]
+  end
+  subgraph NEON["Neon · plan gratuito"]
+    PG[("PostgreSQL<br/>conexión cifrada (TLS)")]
+  end
+  CLI["Navegador<br/>móvil, tableta o computador"]
+  AMZ["Imágenes de Amazon"]
+  LOC -- "git push" --> GH
+  GH -- "despliegue al publicar en main<br/>(render.yaml)" --> WEB
+  CLI -- "HTTPS<br/>gearly-2o9e.onrender.com" --> WEB
+  WEB -- "SQL / TLS" --> PG
+  CLI -. "HTTPS" .-> AMZ

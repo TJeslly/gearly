@@ -4,6 +4,9 @@ Uso:  python scripts/experimento_offline.py CARPETA_DATOS
 Requiere haber ejecutado preparar_datos.py. Escribe docs/resultados_offline.json y docs/RESULTADOS_OFFLINE.md.
 
 - Escenarios: k = 1, 3 y 5 señales visibles (prefijos del apoyo). Principal: k = 3, K = 10.
+- Listas de K = 5 y K = 10. Un caso con menos de K candidatos se registra y se excluye de la comparación con ese K.
+- Métricas técnicas: cobertura del catálogo, listas vacías (el método no puntúa ningún candidato),
+  tiempo por lista y memoria pico del proceso, en el equipo documentado en la salida.
 - Candidatos: catálogo menos las señales visibles. Objetivos: positivas posteriores al apoyo.
 - Alfa del híbrido: se elige en validación entre 0,25 / 0,50 / 0,75 (NDCG@10, k = 3) y se aplica sin cambios en prueba.
 - Incertidumbre: bootstrap por usuarios, 2000 remuestreos, semilla fija.
@@ -11,8 +14,13 @@ Requiere haber ejecutado preparar_datos.py. Escribe docs/resultados_offline.json
 """
 import json
 import math
+import os
+import platform
 import random
+import resource
+import statistics
 import sys
+import time
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parents[1]
@@ -20,10 +28,11 @@ sys.path.insert(0, str(RAIZ / 'backend'))
 from app.recomendador import Recomendador, _ordenar  # noqa: E402
 
 K = 10
+KS = (5, 10)
 SEMILLA = 20261107
 
 
-def metricas(lista, objetivos):
+def metricas(lista, objetivos, K=K):
     rel = set(objetivos)
     aciertos = [1 if x in rel else 0 for x in lista[:K]]
     dcg = sum(a / math.log2(j + 2) for j, a in enumerate(aciertos))
@@ -31,29 +40,42 @@ def metricas(lista, objetivos):
     return {'ndcg': dcg / idcg if idcg else 0.0, 'precision': sum(aciertos) / K, 'recall': sum(aciertos) / len(rel) if rel else 0.0}
 
 
-def evaluar(rec, casos, metodo, k):
+def evaluar(rec, casos, metodo, k, K=K):
+    """Devuelve una fila por usuario (None si tiene menos de K candidatos) y la cobertura del catálogo."""
     filas, vistos = [], set()
     todos = list(rec.productos)
     for c in casos:
         visibles = c['apoyo'][:k]
         cand = [p for p in todos if p not in set(visibles)]
+        if len(cand) < K:  # se registra y se excluye de la comparación con este K
+            filas.append(None)
+            continue
+        t0 = time.perf_counter()
         puntos, _ = rec.puntajes(metodo, [], [], visibles, cand)
         lista = [p for p, _ in _ordenar(puntos, K)]
+        ms = (time.perf_counter() - t0) * 1000
         if len(lista) < K:  # completa con popularidad y lo registra
             extra = [p for p, _ in _ordenar({p: float(rec.popularidad.get(p, 0)) for p in cand if p not in lista}, K - len(lista))]
             lista += extra
         vistos.update(lista)
-        m = metricas(lista, c['objetivos'])
+        m = metricas(lista, c['objetivos'], K)
         m['completada'] = len(puntos) < K
+        m['vacia'] = len(puntos) == 0
+        m['ms'] = ms
         filas.append(m)
     return filas, len(vistos) / len(todos)
 
 
-def azar(rec, casos, k, reps=30):
+def percentil(xs, q):
+    xs = sorted(xs)
+    return xs[min(len(xs) - 1, int(round(q * (len(xs) - 1))))]
+
+
+def azar(rec, casos, k, reps=30, K=K):
     rnd = random.Random(SEMILLA); todos = list(rec.productos); out = []
     for c in casos:
         vis = set(c['apoyo'][:k]); cand = [p for p in todos if p not in vis]
-        out.append(sum(metricas(rnd.sample(cand, K), c['objetivos'])['ndcg'] for _ in range(reps)) / reps)
+        out.append(sum(metricas(rnd.sample(cand, K), c['objetivos'], K)['ndcg'] for _ in range(reps)) / reps)
     return out
 
 
@@ -98,9 +120,39 @@ def main():
     for k in (1, 3, 5):
         for a, b in (('hibrido', 'contenido'), ('hibrido', 'popularidad'), ('hibrido', 'colaborativo'), ('colaborativo', 'contenido')):
             difs[f'{a}-{b}_k{k}'] = bootstrap(por_usuario[(a, k)], por_usuario[(b, k)])
+    # Listas de 5: mismas personas y condiciones que K = 10
+    res5, difs5, por5 = {}, {}, {}
+    for k in (1, 3, 5):
+        res5[f'azar_k{k}'] = {'ndcg5': media(azar(rec, casos, k, K=5))}
+        for m in ('popularidad', 'contenido', 'colaborativo', 'hibrido'):
+            filas, cob = evaluar(rec, casos, m, k, K=5)
+            val = [f for f in filas if f is not None]
+            por5[(m, k)] = [f['ndcg'] for f in val]
+            res5[f'{m}_k{k}'] = {'ndcg5': media([f['ndcg'] for f in val]), 'precision5': media([f['precision'] for f in val]),
+                                 'recall5': media([f['recall'] for f in val]), 'cobertura': cob, 'excluidos_menos_de_K': len(filas) - len(val)}
+            print(f'k={k} {m:13s} NDCG@5={res5[f"{m}_k{k}"]["ndcg5"]:.4f}')
+        for a, b in (('hibrido', 'contenido'), ('hibrido', 'popularidad'), ('hibrido', 'colaborativo'), ('colaborativo', 'contenido')):
+            difs5[f'{a}-{b}_k{k}'] = bootstrap(por5[(a, k)], por5[(b, k)])
+
+    # Métricas técnicas (k = 3, K = 10)
+    tecnicas = {}
+    for m in ('popularidad', 'contenido', 'colaborativo', 'hibrido'):
+        filas, cob = evaluar(rec, casos, m, 3)
+        ms = [f['ms'] for f in filas if f]
+        tecnicas[m] = {'cobertura': cob, 'listas_vacias': sum(f['vacia'] for f in filas if f) / len(casos),
+                       'completadas_con_popularidad': sum(f['completada'] for f in filas if f) / len(casos),
+                       'ms_mediana': statistics.median(ms), 'ms_p95': percentil(ms, 0.95), 'excluidos_menos_de_K': sum(f is None for f in filas)}
+    memoria_mb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024
+    equipo = {'sistema': platform.platform(), 'python': platform.python_version(), 'procesador': platform.processor() or platform.machine(),
+              'nucleos': os.cpu_count(), 'memoria_total_gb': round(os.sysconf('SC_PAGE_SIZE') * os.sysconf('SC_PHYS_PAGES') / 1024 ** 3, 1)}
+    print('Técnicas:', tecnicas, 'memoria pico MB', round(memoria_mb, 1), equipo)
+
     salida = {'semilla': SEMILLA, 'K': K, 'usuarios_prueba': len(casos), 'usuarios_validacion': len(ev['validacion']),
               'modelo': modelo['version'], 'alfa_elegido': rec.alfa, 'ajuste_validacion': ajuste, 'resultados': res,
-              'diferencias_ndcg10_ic95': {k: {'media': v[0], 'ic_inf': v[1], 'ic_sup': v[2]} for k, v in difs.items()}}
+              'diferencias_ndcg10_ic95': {k: {'media': v[0], 'ic_inf': v[1], 'ic_sup': v[2]} for k, v in difs.items()},
+              'resultados_k5': res5,
+              'diferencias_ndcg5_ic95': {k: {'media': v[0], 'ic_inf': v[1], 'ic_sup': v[2]} for k, v in difs5.items()},
+              'tecnicas_k3_K10': tecnicas, 'memoria_pico_proceso_mb': round(memoria_mb, 1), 'equipo': equipo}
     (RAIZ / 'docs').mkdir(exist_ok=True)
     json.dump(salida, open(RAIZ / 'docs/resultados_offline.json', 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
 

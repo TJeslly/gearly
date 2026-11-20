@@ -40,3 +40,10 @@ Antes de aplicar la evaluación se cerraron las diferencias entre la especificac
 ## Cambio de población (9 de noviembre de 2026)
 
 La muestra pasa de «estudiantes de la UMB» a **adultos cercanos al equipo: compañeros de la UMB, amigos y familiares**, con interés en running, ciclismo o entrenamiento. Q4 ya no excluye: registra la relación con el equipo para analizarla. Solo excluye responder «No» en Q5. Consentimiento C01-v2. Quien quedó excluido con la regla anterior puede registrarse de nuevo. Limitación: muestra por conveniencia con posible sesgo de complacencia; se informará la relación de cada participante.
+
+## 20 de noviembre de 2026 — correcciones de la tutora
+
+- Experimento offline: se añaden listas de 5 (NDCG@5, Precision@5 y Recall@5) con los mismos usuarios y condiciones que K = 10, y métricas técnicas (cobertura, listas vacías, tiempo por lista y memoria pico) con el equipo documentado. Los resultados de K = 10 se reprodujeron sin cambios.
+- Regla: un caso con menos de K candidatos se registra y se excluye de la comparación con ese K (en este catálogo no hubo ninguno).
+- RF20: registro de modelos. Las versiones se guardan en `data/modelo.json` (inicial) y `data/modelos/*.json`. `GET /api/admin/modelos` muestra la versión activa y la compatibilidad de cada versión con el catálogo publicado; `POST /api/admin/modelos/activar` activa solo una versión compatible y la guarda en la tabla `ajustes`, para conservarla al reiniciar.
+- Diagramas: fuentes Mermaid y PNG en `docs/diagramas/`, publicados en GitHub.

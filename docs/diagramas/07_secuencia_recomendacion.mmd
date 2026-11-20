@@ -1,0 +1,25 @@
+sequenceDiagram
+  autonumber
+  actor U as Participante
+  participant W as Interfaz React
+  participant A as API FastAPI
+  participant B as PostgreSQL
+  participant R as Motor (HIB)
+  U->>W: Guarda deportes, tipos y 0 a 5 productos
+  W->>A: PUT /api/perfil {disciplinas, tipos, selecciones, version} + X-CSRF
+  A->>A: Valida cookie, CSRF, vocabulario, máximo 5 y versión
+  A->>B: Actualiza perfil (version + 1)
+  A-->>W: 200 perfil aceptado (o 409 / 422)
+  W->>A: GET /api/recomendaciones
+  A->>B: Lee perfil de la sesión
+  A->>R: recomendar('hibrido', disciplinas, tipos, selecciones, 10)
+  alt Sin intereses ni selecciones
+    R-->>A: POP (alternativa registrada)
+  else Solo intereses
+    R-->>A: CONT (HIB se reduce a contenido)
+  else Con selecciones
+    R-->>A: α·CONT + (1 − α)·CF
+  end
+  A->>B: Guarda lista: método resultante, versión de modelo, latencia
+  A-->>W: lista_id, método, motivo y 10 productos con explicación
+  W-->>U: Tarjetas con foto, categoría y explicación
